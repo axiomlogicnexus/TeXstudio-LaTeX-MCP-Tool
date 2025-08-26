@@ -15,8 +15,21 @@ async function main() {
       console.log(JSON.stringify(res, null, 2));
       return;
     }
-    if (cmd === "compile" && process.argv[3]) {
-      const res = await compileLatex({ root: process.argv[3] });
+    if (cmd === "compile") {
+      // Accept --root path or join remaining args to form a path
+      const args = process.argv.slice(3);
+      let rootArg: string | undefined;
+      const i = args.indexOf("--root");
+      if (i >= 0 && args[i + 1]) {
+        rootArg = args[i + 1];
+      } else if (args.length) {
+        rootArg = args.join(" ");
+      }
+      if (!rootArg) {
+        console.error("Usage: compile --root <path-to-root.tex> (or compile <path with spaces>)");
+        process.exit(2);
+      }
+      const res = await compileLatex({ root: rootArg });
       console.log(JSON.stringify(res, null, 2));
       return;
     }

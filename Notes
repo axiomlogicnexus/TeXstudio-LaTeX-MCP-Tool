@@ -1,3 +1,2 @@
 latexindent: If MiKTeX lacks Perl or latexindent is missing components, the command may fail. The tool will return stdout/stderr; if needed, we can add a health check for Perl in a later milestone.
 chktex: Current output is returned raw. In a later milestone (advanced diagnostics), we can parse chktex output lines into structured diagnostics for your MCP client.
-Graph/parser is heuristic and conservative; we can expand patterns for more TeX ecosystems in M12.
