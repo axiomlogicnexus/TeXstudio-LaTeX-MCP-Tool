@@ -33,6 +33,8 @@ import { project_scaffold } from "../tools/scaffold.js";
 import { which } from "../discovery/which.js";
 import { runCommand } from "../utils/process.js";
 import { forwardSearchHint } from "../tools/forwardSearch.js";
+import { startLatexWatch, stopLatexWatch, listWatches, tailWatchLog } from "../tools/watch.js";
+import { detectRoot, buildDependencyGraph, computeOutOfDate, expectedPdfPath } from "../tools/projectIntelligence.js";
 
 // ---------------------------------------------------------------------------
 // Zod Schemas for tool inputs
@@ -96,6 +98,37 @@ const ForwardSearchInput = {
   column: z.number().int().optional().describe("Optional column number"),
   pdfPath: z.string().describe("Path to the compiled PDF"),
   os: z.enum(["win32", "darwin", "linux"]).optional().describe("Override OS detection")
+} as const;
+
+// M10 — watch.compile tools
+const WatchStartInput = {
+  root: z.string().describe("Root .tex file to watch"),
+  engine: z.enum(["pdflatex", "xelatex", "lualatex"]).optional(),
+  outDir: z.string().optional(),
+  synctex: z.boolean().optional(),
+  shellEscape: z.boolean().optional(),
+  interaction: z.enum(["batchmode", "nonstopmode", "scrollmode", "errorstopmode"]).optional(),
+  jobname: z.string().optional()
+} as const;
+
+const WatchStopInput = { id: z.string().describe("watch id") } as const;
+const WatchTailInput = { id: z.string().describe("watch id"), lines: z.number().int().optional() } as const;
+
+// M11 — project intelligence
+const DetectRootInput = {
+  startPath: z.string().optional().describe("Start directory or file"),
+  file: z.string().optional().describe("Explicit root .tex (wins)"),
+} as const;
+
+const GraphInput = {
+  root: z.string().describe("Root .tex to analyze"),
+} as const;
+
+const OutOfDateInput = {
+  root: z.string().describe("Root .tex used to compute PDF path and dependencies"),
+  outDir: z.string().optional(),
+  jobname: z.string().optional(),
+  pdfPath: z.string().optional(),
 } as const;
 
 // Additional schemas for M6–M8 tools
@@ -348,6 +381,118 @@ server.registerTool(
       const e = err as Error;
       return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
     }
+  }
+);
+
+// M10 — watch: start
+server.registerTool(
+  "watch.start",
+  {
+    title: "Start LaTeX watch (latexmk -pvc)",
+    description: "Start watching a LaTeX project for changes and rebuild automatically",
+    inputSchema: WatchStartInput
+  },
+  async (args) => {
+    try {
+      const info = startLatexWatch(args);
+      return { content: [{ type: "text", text: JSON.stringify(info, null, 2) }] };
+    } catch (err: unknown) {
+      const e = err as Error;
+      return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+    }
+  }
+);
+
+// M10 — watch: stop
+server.registerTool(
+  "watch.stop",
+  {
+    title: "Stop LaTeX watch",
+    description: "Stop a running latexmk -pvc watcher",
+    inputSchema: WatchStopInput
+  },
+  async (args) => {
+    try {
+      const res = stopLatexWatch(args.id);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    } catch (err: unknown) {
+      const e = err as Error;
+      return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+    }
+  }
+);
+
+// M10 — watch: list
+server.registerTool(
+  "watch.list",
+  {
+    title: "List LaTeX watchers",
+    description: "List running latexmk -pvc watchers"
+  },
+  async () => {
+    const list = listWatches();
+    return { content: [{ type: "text", text: JSON.stringify(list, null, 2) }] };
+  }
+);
+
+// M10 — watch: tail
+server.registerTool(
+  "watch.tail",
+  {
+    title: "Tail watcher log",
+    description: "Return the last N lines from a watcher's buffered output",
+    inputSchema: WatchTailInput
+  },
+  async (args) => {
+    try {
+      const text = tailWatchLog(args.id, args.lines || 200);
+      return { content: [{ type: "text", text }] };
+    } catch (err: unknown) {
+      const e = err as Error;
+      return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+    }
+  }
+);
+
+// M11 — project.detect_root
+server.registerTool(
+  "project.detect_root",
+  {
+    title: "Detect LaTeX root",
+    description: "Heuristically detect the project root .tex",
+    inputSchema: DetectRootInput
+  },
+  async (args) => {
+    const res = detectRoot(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+// M11 — project.graph
+server.registerTool(
+  "project.graph",
+  {
+    title: "Build dependency graph",
+    description: "Parse includes, inputs, subfiles, graphics and bib deps",
+    inputSchema: GraphInput
+  },
+  async (args) => {
+    const res = buildDependencyGraph(args.root);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+// M11 — project.out_of_date
+server.registerTool(
+  "project.out_of_date",
+  {
+    title: "Out-of-date report",
+    description: "Compare PDF mtime vs sources; list newer sources and missing deps",
+    inputSchema: OutOfDateInput
+  },
+  async (args) => {
+    const res = computeOutOfDate(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
   }
 );
 

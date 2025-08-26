@@ -45,18 +45,18 @@ Milestones (ordered: most relevant/easiest first → least relevant/hardest)
 - [x] M9 — Forward search hints
   - forward_search_hint(texFile, line, column, pdfPath, os?) ✔
 
-- [ ] M10 — Watch mode (real-time compilation)
-  - Debounced file watching; incremental recompile
-  - Cancellation support; stream/chunk logs
+- [x] M10 — Watch mode (real-time compilation)
+  - Debounced file watching; incremental recompile ✔
+  - Cancellation support; stream/chunk logs ✔
 
-- [ ] M11 — Project intelligence
-  - Root detection: explicit > magic comment > latexmkrc > heuristics
-  - Dependency graph: include/input/subfile/includegraphics parsing and caching
-  - Out-of-date detection
+- [x] M11 — Project intelligence
+  - Root detection: explicit > magic comment > latexmkrc > heuristics ✔
+  - Dependency graph: include/input/subfile/includegraphics parsing and caching ✔
+  - Out-of-date detection ✔
 
-- [ ] M12 — Advanced diagnostics
-  - Categorize missing packages/files with actionable hints (install via tlmgr/miktex, fix paths, add \usepackage)
-  - Better kpathsea decoding and over/underfull location mapping
+- [x] M12 — Advanced diagnostics
+  - Categorize missing packages/files with actionable hints (install via tlmgr/miktex, fix paths, add \usepackage) ✔
+  - Better kpathsea decoding and over/underfull location mapping ✔
 
 - [ ] M13 — Security & safety
   - Path normalization and workspace containment
