@@ -2,6 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import { which } from "../discovery/which.js";
 import { runCommand } from "../utils/process.js";
+import { resolveTeXstudioPath } from "../discovery/texstudioPath.js";
 
 export interface OpenOptions {
   file: string;
@@ -13,14 +14,12 @@ export interface OpenOptions {
 }
 
 export async function isTeXstudioAvailable(): Promise<{ path: string | null; }> {
-  const name = os.platform() === "win32" ? "texstudio.exe" : "texstudio";
-  const p = which(name);
+  const p = await resolveTeXstudioPath();
   return { path: p };
 }
 
 export async function openInTeXstudio(opts: OpenOptions): Promise<{ opened: boolean; command: string; args: string[]; code: number | null; }> {
-  const name = os.platform() === "win32" ? "texstudio.exe" : "texstudio";
-  const exe = which(name) || name;
+  const exe = (await resolveTeXstudioPath()) || (os.platform() === "win32" ? "texstudio.exe" : "texstudio");
   const args: string[] = [];
   if (typeof opts.line === "number") args.push("--line", String(opts.line));
   if (typeof opts.column === "number") args.push("--column", String(opts.column));

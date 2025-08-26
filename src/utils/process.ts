@@ -1,21 +1,36 @@
+// Process utilities: safe child process spawning for external tools
+// - No shell execution: avoids injection and quoting issues
+// - Captures stdout and stderr
+// - Optional timeout and cancellation support
 import { spawn, SpawnOptions } from "node:child_process";
 
 export interface RunOptions {
+  // Working directory for the process
   cwd?: string;
+  // Environment variables override
   env?: NodeJS.ProcessEnv;
+  // Kill the process after this many milliseconds
   timeoutMs?: number;
+  // AbortSignal to cancel the process from the caller
   signal?: AbortSignal;
 }
 
 export interface RunResult {
+  // Executable invoked
   command: string;
+  // Argument list
   args: string[];
+  // Exit code (null if terminated/killed)
   code: number | null;
+  // Captured stdout
   stdout: string;
+  // Captured stderr
   stderr: string;
+  // Whether a timeout occurred
   timedOut: boolean;
 }
 
+// Run a command with args, returning captured output and exit status
 export async function runCommand(command: string, args: string[], options: RunOptions = {}): Promise<RunResult> {
   return new Promise<RunResult>((resolve, reject) => {
     const spawnOpts: SpawnOptions = {
@@ -23,7 +38,7 @@ export async function runCommand(command: string, args: string[], options: RunOp
       env: options.env,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
-      shell: false,
+      shell: false, // use args array; do not invoke a shell
     };
 
     const child = spawn(command, args, spawnOpts);
@@ -37,6 +52,7 @@ export async function runCommand(command: string, args: string[], options: RunOp
       if (timeout) clearTimeout(timeout);
     };
 
+    // Enforce timeout if requested
     if (options.timeoutMs && options.timeoutMs > 0) {
       timeout = setTimeout(() => {
         if (finished) return;
@@ -46,6 +62,7 @@ export async function runCommand(command: string, args: string[], options: RunOp
       }, options.timeoutMs);
     }
 
+    // Support external cancellation
     options.signal?.addEventListener("abort", () => {
       try { child.kill(); } catch {}
     });

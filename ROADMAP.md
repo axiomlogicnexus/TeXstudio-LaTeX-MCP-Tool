@@ -33,17 +33,17 @@ Milestones (ordered: most relevant/easiest first → least relevant/hardest)
 - [x] M5 — Project scaffolding
   - project.scaffold(template, name?, author?, withBib?, withLatexmkrc?) ✔
 
-- [ ] M6 — Linting
-  - lint.chktex(files[], config?, minSeverity?)
+- [x] M6 — Linting
+  - lint.chktex(files[], config?, minSeverity?) ✔
 
-- [ ] M7 — Formatting
-  - format.latexindent(fileOrText, config?, inPlace?, preserveEOL?)
+- [x] M7 — Formatting
+  - format.latexindent(fileOrText, config?, inPlace?, preserveEOL?) ✔
 
-- [ ] M8 — Bibliography build
-  - bib.build(tool: biber|bibtex, rootOrAux)
+- [x] M8 — Bibliography build
+  - bib.build(tool: biber|bibtex, rootOrAux) ✔
 
-- [ ] M9 — Forward search hints
-  - forward_search_hint(texFile, line, column, pdfPath, os?)
+- [x] M9 — Forward search hints
+  - forward_search_hint(texFile, line, column, pdfPath, os?) ✔
 
 - [ ] M10 — Watch mode (real-time compilation)
   - Debounced file watching; incremental recompile
@@ -96,9 +96,9 @@ Milestones (ordered: most relevant/easiest first → least relevant/hardest)
   - Golden-file tests for log parser (errors, warnings, hboxes, kpathsea)
   - Integration tests (feature-flagged)
 
-- [ ] M22 — MCP server wiring
-  - Add MCP server SDK; expose tools with JSON schemas
-  - Streaming outputs/events if supported by client
+- [x] M22 — MCP server wiring
+  - Add MCP server SDK; expose tools with JSON schemas ✔
+  - Streaming outputs/events if supported by client (pending; not required for MVP)
 
 - [ ] M23 — Configuration & precedence
   - Config schema; precedence: env > user config > project config > defaults
