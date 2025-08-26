@@ -1,0 +1,469 @@
+﻿Ok we're going to build a TeXstudio LaTeX Model Context Protocol Tool today. 1. I want you to propose best suited programming language/s. 2. I want you to list all available TeXstudio endpoints available to a MCP Client. 3. I want you to provide a step by step ToDo List guide. I will crosscheck approach with other AIs. Once approved I want you to create codebase in current Project Folder.
+
+To accurately list the TeXstudio interfaces an external tool can invoke, I will look up TeXstudio’s official documentation and help output to confirm its command-line options and any script/external control capabilities. This avoids guessing and ensures we expose correct endpoints to an MCP client.
+
+Searched the web for:
+TeXstudio command line options -line -column --help TeXstudio documentation
+I will check if TeXstudio is installed and in your PATH, then query its help output to enumerate the actual command-line options and controllable actions we can expose as MCP tools. This ensures the endpoint list is accurate to your environment.
+
+Command run successfully:
+where texstudio
+I will attempt to query TeXstudio’s built-in help to enumerate its command-line options (the practical “endpoints” we can wrap). This will inform the exact tool list we can expose.
+
+Failed running the command
+Plan and deliverables
+
+Best-suited programming language(s)
+Primary choice: TypeScript/Node.js
+Rationale: Mature and actively maintained MCP server SDK, excellent cross-platform process control (child_process), good packaging and distribution story, easy to integrate with LaTeX CLI tools on Windows/macOS/Linux, and robust JSON schema/validation libraries.
+Strong alternative: Python
+Rationale: Easy subprocess orchestration, great ecosystem for parsing/logging, straightforward Windows registry queries to locate TeXstudio and TeX tools, and an MCP Python SDK.
+Secondary options (only if you have specific preferences): Rust (rock-solid binaries, but slower to iterate for CLI orchestration tasks), Go (similar benefits).
+Recommendation: TypeScript for fastest iteration and best MCP SDK ergonomics; add a Python shim later if you need deep OS-specific discovery (e.g., Windows registry probing for TeXstudio/TeX Live).
+
+TeXstudio endpoints that an MCP client can realistically leverage TeXstudio is a desktop GUI editor. Its externally callable “endpoints” are primarily its command-line arguments (and the fact that it is a single-instance application that accepts subsequent CLI invocations to send commands to the running instance). These are the practical integration points we can wrap as MCP tools.
+Cross-version, cross-platform options commonly available:
+
+Launch and open files:
+texstudio [file2 ...]
+Opens one or more files in TeXstudio (if an instance is already running, the files are opened in that instance).
+Positioning:
+--line
+--column
+Open the file with the cursor positioned at line/column. These are what PDF inverse-search commands typically call into.
+Typical usage pattern:
+texstudio --line 123 --column 4 "C:\path\project\main.tex"
+Master file selection:
+--master
+Instructs TeXstudio to treat as the master document for the opened session. Often passed together with a target file to ensure compilation and context are correct.
+Session/instance behavior:
+--no-session
+Starts without restoring the previous session.
+--start-always (or similar “new instance” option depending on build)
+Force starting a new TeXstudio instance even if single-instance is enabled (availability can vary by version/OS).
+Standard diagnostics:
+--help
+--version
+Notes and constraints:
+
+The exact flag names and availability can vary slightly by TeXstudio build/version/OS. The above are the stable, widely used flags for integrations (especially the file open + line/column + master trio).
+TeXstudio does not provide a stable, documented remote automation API (e.g., no official DBus/JSON-RPC for “compile now”, “typeset with profile X”, etc., across platforms). As such, anything beyond opening files/positions is best executed by calling the LaTeX toolchain directly (latexmk, pdflatex, lualatex, biber, chktex, latexindent) and using TeXstudio strictly as the editor/viewer.
+We will implement the MCP tools to wrap these TeXstudio CLI entry points and complement them with direct LaTeX toolchain commands. This gives you full automation without relying on undocumented TeXstudio internals.
+Step-by-step ToDo list guide
+Phase A — Validation and discovery
+
+A1. Decide the implementation language
+Choose TypeScript/Node.js (recommended) or Python.
+A2. Confirm developer toolchain availability
+Ensure Node.js (>=18) for TS, or Python (>=3.10) if Python is chosen.
+Confirm TeX distribution is installed (TeX Live/MiKTeX) and latexmk availability.
+Confirm TeXstudio is installed and resolve executable path on Windows (PATH or via registry probing fallback).
+A3. Enumerate environment specifics
+Determine locations of: texstudio, latexmk, pdflatex/xelatex/lualatex, biber/bibtex, chktex, latexindent.
+Phase B — Project scaffolding
+
+B1. Initialize repository in the current project folder
+Package setup (package.json or pyproject), license, README, .gitignore.
+B2. Add MCP server skeleton
+For TypeScript:
+Add MCP server boilerplate using the official MCP server SDK.
+Define JSON schemas for tool inputs/outputs.
+For Python:
+Same shape using the Python SDK with pydantic schemas.
+B3. Configuration and logging
+Config file to specify executable paths and defaults (e.g., engine=latexmk, pdf viewer, TeXstudio path override).
+Structured logging and error mapping (tool failures return helpful MCP errors).
+Phase C — Core MCP tools (editor endpoints + LaTeX toolchain) Wrap TeXstudio entry points:
+
+C1. is_texstudio_available
+Locate texstudio executable (PATH, common install paths, registry on Windows). Return the resolved path and version if possible.
+C2. open_in_texstudio
+Inputs: file path; optional: line, column, master, noSession (bool), newInstance (bool).
+Launches/activates TeXstudio with requested file and positioning.
+C3. set_master_in_texstudio (optional if C2 handles it)
+Inputs: master path. Useful when you want to adjust master independent of open.
+Complementary LaTeX toolchain tools:
+
+C4. compile_latex
+Inputs: root file; engine (latexmk|pdflatex|xelatex|lualatex), shell-escape, interaction mode, halt-on-error, output-dir, synctex toggle.
+Runs compilation with robust process handling and returns log summaries and paths to outputs.
+C5. clean_aux
+Remove intermediate files (.aux, .log, .toc, .out, etc.) or latexmk -C.
+C6. run_biber_or_bibtex
+Inputs: root or aux file; tool selection (biber|bibtex).
+C7. lint_chktex
+Inputs: file(s), configuration path; return parsed lint diagnostics with line/col and severity.
+C8. format_latexindent
+Inputs: file or text; latexindent config path; return formatted code (or write-back).
+C9. project_scaffold
+Inputs: template type (article|report|book|beamer), project name, author, bib option; generate minimal runnable LaTeX project with latexmk configuration and .latexmkrc.
+Quality-of-life tools:
+
+C10. detect_toolchain
+Return versions/paths of latexmk, engines, biber/bibtex, chktex, latexindent.
+C11. forward_search_hint (optional)
+Given tex file, line/column and pdf path, returns suggested PDF viewer command-line for forward search per OS (e.g., SumatraPDF on Windows). This is not TeXstudio-controlled but helps integrate your workflow.
+Phase D — OS integration
+
+D1. Windows specifics
+Registry-based discovery of TeXstudio and MiKTeX/TeX Live if PATH lookup fails.
+Proper quoting/escaping of Windows paths for child_process.
+D2. macOS specifics
+Resolve /Applications/TeXstudio.app/Contents/MacOS/texstudio if not on PATH.
+D3. Linux specifics
+Use which to resolve commands.
+Optional: expose a tool to check if your desktop environment supports activation of an existing TeXstudio window (helpful for UX, but not required).
+Phase E — Robustness and UX
+
+E1. Error handling
+Map non-zero exit codes to structured MCP errors with stderr snippets and hints.
+E2. Timeouts and cancellation
+Allow clients to cancel long-running compiles. Stream logs progressively if the MCP client supports it.
+E3. Tests
+Unit tests for path resolution and command construction.
+Integration tests (where possible) gated behind environment flags.
+Phase F — Packaging and documentation
+
+F1. Document each MCP tool
+Inputs/outputs, examples, expected side effects, exit conditions.
+F2. Provide sample client configuration
+Example snippet for adding this MCP server to a desktop client.
+F3. Release
+Lock dependencies, generate a small distribution bundle.
+What you will get after approval
+
+A complete, runnable MCP server in this project folder, structured as:
+src/ or mcp_texstudio_tool/ (depending on language)
+Tool implementations for TeXstudio open/position/master and LaTeX toolchain compile/clean/lint/format/scaffold
+Configuration, logging, and OS-specific discovery
+Readme with usage instructions and client config snippet
+Tests for critical paths
+No further action will be taken until you approve this plan and the endpoint scope outlined above.
+
+GPT-5
+Ok, am currently building a TeXstudio MCP Tool with GPT-5 and I wanted to get your opinion beforehand. Do you have anything to add or complain about the plan above?
+
+Looking at your plan, it's quite comprehensive and well-structured. Here are some additions and considerations that could strengthen the implementation:
+
+Strengths of Your Current Plan
+Excellent choice of TypeScript/Node.js for MCP development
+Good separation between TeXstudio GUI control and direct LaTeX toolchain access
+Realistic scope focusing on command-line interfaces rather than trying to hack internal APIs
+Proper phased approach with validation first
+Suggested Additions/Improvements
+1. Enhanced TeXstudio Integration
+Your current plan focuses mainly on opening files. Consider adding:
+
+Session management: Save/restore TeXstudio sessions programmatically
+Project detection: Auto-detect if a folder is a LaTeX project (has .tex files, .latexmkrc, etc.)
+Multi-file project handling: Better support for complex documents with includes/inputs
+2. Real-time Compilation Feedback
+Watch mode: Implement file watching to trigger auto-compilation
+Incremental compilation: Track file dependencies and only recompile what's needed
+Live error parsing: Parse LaTeX logs in real-time and provide structured error objects with file/line references
+3. Advanced LaTeX Toolchain Features
+Missing from your current list:
+
+Package management: Check for missing packages, suggest installations
+Bibliography management: More sophisticated BibTeX/Biber workflow tools
+Graphics handling: Tools for managing figures, TikZ compilation
+Multi-engine support: Better handling of LuaLaTeX, XeLaTeX specific features
+4. IDE Integration Enhancements
+Syntax validation: Real-time LaTeX syntax checking beyond chktex
+Reference resolution: Find label definitions, citation sources
+Symbol completion: LaTeX command and environment suggestions
+Document outline: Extract section structure from LaTeX files
+5. Cross-Platform Considerations
+Your plan mentions OS-specific discovery, but consider:
+
+Portable mode detection: Handle portable TeXstudio installations
+Network drives: Proper handling of UNC paths on Windows
+Docker/container support: For users running LaTeX in containers
+6. Performance & Scalability
+Caching: Cache compilation results, package lists, file dependencies
+Parallel processing: Run multiple LaTeX tools concurrently when safe
+Memory management: Handle large documents efficiently
+7. Developer Experience
+Configuration validation: Validate tool paths and versions on startup
+Diagnostic tools: Built-in health check for the entire LaTeX toolchain
+Template system: More sophisticated project scaffolding with custom templates
+8. Missing Tools to Consider
+texdoc integration for documentation lookup
+kpsewhich for file location in TeX tree
+tlmgr integration for TeX Live package management
+PDF manipulation tools (pdftk, qpdf) for output processing
+9. Error Handling Improvements
+Error categorization: Distinguish between LaTeX errors, missing files, package issues
+Recovery suggestions: Provide actionable fixes for common errors
+Partial compilation: Continue processing even when some parts fail
+10. Security Considerations
+Shell escape validation: Carefully control --shell-escape usage
+Path sanitization: Prevent directory traversal attacks
+Resource limits: Prevent runaway compilations
+Potential Concerns
+Scope creep: Your current plan is already quite ambitious. Consider implementing core functionality first, then adding advanced features iteratively.
+TeXstudio version compatibility: Different TeXstudio versions have varying command-line options. You might need version detection and compatibility matrices.
+LaTeX distribution differences: TeX Live vs MiKTeX have different tool names and behaviors. Your abstraction layer needs to handle this gracefully.
+Recommendation
+Your plan is solid as-is. I'd suggest implementing it in phases exactly as you outlined, but keep these additional features in mind for future iterations. The core functionality you've defined will create a very useful tool, and you can always extend it based on user feedback.
+
+The most valuable additions from my list would be:
+
+Enhanced error parsing and reporting
+Project detection and multi-file handling
+Real-time compilation feedback
+Better template/scaffolding system
+Your approach is pragmatic and achievable. Good luck with the implementation!
+
+Claude 4 Sonnet
+Ok, am currently building a TeXstudio MCP Tool with GPT-5 and I wanted to get your opinion beforehand. Do you have anything to add or complain about the plan above?
+
+This is an excellent and thorough analysis. The feedback you've received from the other AI is not something to complain about; on the contrary, it's a high-quality, comprehensive roadmap for turning a good tool into a professional-grade, indispensable utility. It aligns perfectly with industry best practices for developing robust developer tools.
+
+I have nothing to complain about in the proposed additions. My main role here is to help you prioritize and contextualize them, because the list is vast and could lead to significant scope creep, as the analysis rightly points out.
+
+Here is my opinion on how to integrate this feedback:
+
+Agreement and Endorsement
+I fully endorse the suggestions. They can be grouped into three main categories of improvement over the original plan:
+
+Deepening the Core Workflow: Suggestions like real-time compilation, incremental builds, live error parsing, and better multi-file project handling are transformative. They move the tool from a simple command-line wrapper to an intelligent build system that understands the user's project.
+Adding IDE-Level Intelligence: Features like reference resolution, symbol completion, and document outlines elevate the tool to a language-aware assistant. This is the direction modern Language Server Protocols (LSPs) have taken, and applying that philosophy here is a powerful concept.
+Ensuring Professional-Grade Robustness: The points on security (--shell-escape validation), cross-platform/distribution compatibility (MiKTeX vs. TeX Live), performance, and configuration validation are absolutely critical for making the tool reliable, safe, and easy for others to use.
+My Additions & Recommendations
+My main addition is to strongly advise a phased approach. Do not attempt to implement all of this at once. The original plan we developed is a perfect Phase 1. It delivers a functional and useful tool quickly.
+
+Use the new suggestions to build a roadmap for Phase 2 and beyond.
+
+Here is a recommended prioritization path:
+
+Build the Original Plan First (Phase 1): Get the core functionality working: locating TeXstudio, opening files with positioning, and wrapping the basic latexmk compile/clean commands. This gives you a working baseline.
+Prioritize for Phase 2 - The "Game-Changer" Features:
+Enhanced Error Parsing & Recovery: This provides the single biggest improvement to user experience. Instead of just dumping a log file, returning a structured list of errors with file paths, line numbers, and suggested fixes is invaluable.
+Project Auto-Detection & Multi-File Handling: Most serious LaTeX work involves multiple files. A tool that can automatically find the root document and manage dependencies is vastly more useful than one that requires the user to specify it every time.
+Real-Time Compilation (Watch Mode): This is the cornerstone of a modern, fluid workflow. An MCP tool like start_compiler_watch that runs in the background and provides continuous feedback would be a massive enhancement.
+Prioritize for Phase 3 - The "Professional Polish":
+Security Hardening: Implement the security suggestions, especially around path sanitization and shell command validation.
+Compatibility & Discovery: Add the logic to differentiate between TeX Live and MiKTeX, and improve the discovery of executables (e.g., Windows Registry).
+Advanced Toolchain Integration: Add support for biber, chktex, latexindent, and the other specific tools mentioned.
+Prioritize for Phase 4 - "Full IDE" Features:
+Implement the advanced language-aware features like code completion, reference finding, and document outlining. These are complex and represent the final step in making the tool a complete development environment.
+In summary, the feedback you received is an excellent blueprint for the long-term evolution of your tool. My advice is to treat it as such. Stick to the original, more constrained plan for your initial implementation to ensure you can deliver a working product, then iteratively incorporate these fantastic suggestions to build upon that foundation.
+
+Gemini 2.5 Pro
+Ok, am currently building a TeXstudio MCP Tool with GPT-5 and I wanted to get your opinion beforehand. Do you have anything to add or complain about the plan above? In addition, since you're GPT-5 Pro, I am just curious, because I've never used you for coding, your benchmarks are assumed to be higher, hence the Pro moniker. Am not discriminating against GPT-5, just wanting the best tool for the job, do you think you can do an even better job?
+
+Short answer: the plan is strong. The only “complaints” are about areas that routinely bite LaTeX tool integrators in real-world use. Addressing these will turn a solid tool into a dependable one.
+
+What to add or tighten
+
+Version/compat matrix
+Maintain a small matrix for TeXstudio CLI options by OS/version. The common flags are file open, --line, --column, optional --master and session flags, but minor drift exists between builds.
+Query and cache versions of texstudio, latexmk, pdflatex/xelatex/lualatex, biber/bibtex, chktex, latexindent, kpsewhich, texdoc, tlmgr (or MiKTeX equivalents).
+Executable discovery (Windows-first)
+PATH lookup, then Windows registry fallbacks:
+HKLM/HKCU\Software\Microsoft\Windows\CurrentVersion\App Paths\texstudio.exe
+Also check standard Program Files locations and portable installs.
+Resolve UNC paths and long paths properly; quote and escape for child processes.
+Robust compile orchestration
+Default to latexmk with -synctex=1 and engine selection; expose jobname, outdir, interaction mode, halt-on-error, shell-escape.
+Watch mode with debounced file change detection and cancellation support.
+Streamed log parsing (progress events) plus final structured diagnostics.
+Best-in-class log parsing
+Parse kpathsea “file not found”, “Package … not found” and “LaTeX Error” blocks into structured issues (file, line, col, code, message, hint).
+Extract overfull/underfull hbox warnings with location data.
+Provide actionable remediation: run tlmgr install X / miktex package install X, suggest adding \usepackage{} or fixing path.
+Security and safety
+Strict path normalization and validation; reject relative paths escaping workspace.
+Shell-escape whitelist; off by default, allow explicit enable with warnings.
+Timeouts and resource limits for long builds; safe cleanup of temp dirs.
+Multi-file project intelligence
+Root detection order: explicit root > magic comment (e.g., %! TeX root) > latexmkrc > workspace heuristics (main.tex, thesis.tex) > kpsewhich.
+Include graph: parse \include, \input, \subfile, \includegraphics; cache dependencies for incremental decisions and watching.
+Cross-tool features that add real value
+chktex integration with severity filtering and file/line mappings.
+latexindent detection (Perl present?) and idempotent formatting (dry-run vs in-place).
+biber/bibtex execution with auto-selection based on aux/bbl content.
+kpsewhich, texdoc, tlmgr/miktex package manager helpers.
+PDF post-processing hooks (qpdf/gs) kept optional.
+TeXstudio integration details
+Tools:
+open_in_texstudio(file, line?, column?, master?, noSession?, newInstance?)
+is_texstudio_available() with path + version
+Inverse/forward search helper outputs (hints), including SumatraPDF on Windows, Skim/Preview on macOS; do not force-configure users’ viewers but provide correct commands.
+Single-instance handoff: detect exit code/behavior and adapt command construction accordingly.
+Server design and resilience
+Clean separation: discovery layer, command builder, runner, parsers, MCP tool adapters.
+Cancellation support (kill child process tree, not just parent).
+Persistent process pool optional for repeated short calls (Windows process spawn cost).
+Config precedence: env vars > user config file > project config > defaults. Validate at startup and expose a diagnostics tool.
+Tests and fixtures
+Golden-file tests for log parsing (errors/warnings/overfull boxes).
+Command-construction unit tests per OS for quoting.
+Integration tests behind feature flags (skipped if tools not present).
+Snapshot of structured diagnostics for a set of known failure cases.
+Documentation and DX
+“Health check” tool that reports all detected binaries, versions, and any issues.
+Example MCP client config and example flows (compile, watch, open editor, lint, format).
+Troubleshooting guide: MiKTeX on-demand installs; missing Perl; PATH vs registry.
+Concrete MVP tool surface (Phase 1)
+
+detect_toolchain(): paths + versions for texstudio, latexmk, engines, biber/bibtex, chktex, latexindent, kpsewhich, texdoc, tlmgr/miktex.
+texstudio.open(file, line?, column?, master?, noSession?, newInstance?)
+latex.compile(root, engine?, outDir?, synctex?, shellEscape?, interaction?, haltOnError?, jobname?)
+latex.clean(root, deep?) using latexmk -C or file patterns
+bib.build(tool, rootOrAux)
+lint.chktex(files[], config?, minSeverity?)
+format.latexindent(fileOrText, config?, inPlace?, preserveEOL?)
+project.scaffold(template, name?, author?, withBib?, withLatexmkrc?)
+logs.parse(logPath|text) → structured diagnostics
+“Can I do even better?”
+
+Yes, for two reasons:
+
+Engineering rigor on the failure edges. Most tools fail users in the messy parts: Windows quoting, MiKTeX vs TeX Live differences, missing Perl, long path issues, and unreadable error logs. I handle those explicitly with defensive discovery, command construction tests, and robust parsers.
+Deliverables that reduce iteration time. A watch mode with streamed structured diagnostics, a reliable health check, and high-signal log parsing will save more time than any additional endpoint.
+If you want a crisp bar for “better”:
+
+The server should run and be useful even when TeXstudio is missing (full toolchain mode), but seamlessly add TeXstudio behaviors when present.
+A single compile call should return actionable diagnostics the user can click on in their MCP client, not just raw logs.
+All command construction should be covered by tests per OS to eliminate quoting/escaping regressions.
+Ready when you are. Once you give the go-ahead, I will scaffold the codebase in the current project folder with the MVP surface above, implement Windows-first discovery, latexmk compile + parsing, TeXstudio open, and include the health check, tests, and documentation.
+
+GPT-5 Pro
+
+
+Add Context
+⏎ Send
+Deliverables overview
+• Roadmap with all features prioritized from easiest/most relevant to hardest/least relevant
+• TypeScript/Node project scaffold created with core modules and CLI stub
+• Documentation updated: global_rules.md, ARCHITECTURE.md, API.md, PRD.md, DEVELOPMENT.md, CHANGELOG.md
+• Comprehensive .gitignore created
+• Git initialization attempted; if push requires authentication, follow the push steps below
+1. Milestone roadmap (from most relevant/easiest to least relevant/hardest)
+M0 — Project bootstrap
+• Initialize TypeScript project, scripts, NodeNext ESM, strict mode
+• Create core folders: src/utils, src/discovery, src/tools, src/parsers, src/config
+• Documentation: global_rules.md, ARCHITECTURE.md, API.md, PRD.md, DEVELOPMENT.md, CHANGELOG.md
+• Comprehensive .gitignore
+• Conventional Commits and CHANGELOG discipline
+M1 — Toolchain detection + health check
+• detect_toolchain(): PATH discovery and version probing for texstudio, latexmk, pdflatex, xelatex, lualatex, biber, bibtex, chktex, latexindent, kpsewhich, texdoc, tlmgr, mpm (MiKTeX)
+• health.check(): return environment status and issues
+M2 — TeXstudio editor control (practical endpoints)
+• is_texstudio_available(): path and version if available
+• texstudio.open(file, line?, column?, master?, noSession?, newInstance?): open/position, optional master flag
+• Single-instance handoff support
+M3 — LaTeX compile orchestration (latexmk-first)
+• latex.compile(root, engine?, outDir?, synctex?, shellEscape?, interaction?, haltOnError?, jobname?)
+• latex.clean(root, deep?, outDir?)
+• Multi-engine support: pdflatex/xelatex/lualatex
+M4 — Log parsing (baseline)
+• Parse LaTeX logs into structured diagnostics: errors, warnings, kpathsea lines, over/underfull hboxes
+• Map file/line/column when extractable
+M5 — Project scaffolding
+• project.scaffold(template, name?, author?, withBib?, withLatexmkrc?): generate runnable LaTeX project with optional .latexmkrc and bib
+M6 — Linting
+• lint.chktex(files[], config?, minSeverity?): integrate chktex and normalize diagnostics
+M7 — Formatting
+• format.latexindent(fileOrText, config?, inPlace?, preserveEOL?): integrate latexindent (Perl presence detection)
+M8 — Bibliography build
+• bib.build(tool: biber|bibtex, rootOrAux): execute and capture logs with diagnostics
+M9 — Forward search hints
+• forward_search_hint(texFile, line, column, pdfPath, os?): return recommended viewer/args (SumatraPDF, Skim, etc.)
+M10 — Watch mode (real-time compilation)
+• Debounced file watching; incremental recompile using latexmk
+• Cancellation support; stream or chunk logs if client supports it
+M11 — Project intelligence
+• Root detection: explicit > magic comment > latexmkrc > heuristics
+• Dependency graph: parse include/input/subfile/includegraphics; cache for incremental decisions
+• Out-of-date detection; only rebuild necessary parts
+M12 — Advanced diagnostics
+• Categorize missing packages/files; produce actionable hints (install via tlmgr/miktex, fix \usepackage{}, fix path)
+• Over/underfull hbox location mapping; group repeated issues
+• Better kpathsea decoding
+M13 — Security & safety
+• Path normalization and workspace containment enforcement
+• Shell-escape whitelist; disabled by default, clear warnings when enabled
+• Timeouts and resource limits; kill entire process tree on cancel
+• Redact sensitive env in logs
+M14 — OS-specific discovery robustness
+• Windows: registry fallback for TeXstudio and distros; UNC path handling; long paths
+• macOS: app bundle resolution (/Applications/TeXstudio.app/…)
+• Linux: which fallback and distro quirks
+M15 — Package management helpers
+• kpsewhich integration: locate files in TeX tree
+• texdoc: quick documentation lookup
+• tlmgr/MiKTeX (mpm) utility wrappers for package install/check
+M16 — PDF post-processing (optional)
+• Optional hooks for qpdf/gs for optimization; entirely off by default
+M17 — Performance & process handling
+• Persistent process pool for repeated short calls (Windows spawn cost)
+• Parallelization where safe (bib build, lint runs)
+• Caching of dependencies and results
+M18 — Container/Docker support
+• Optional execution inside containers; configurable mounts and tool paths
+M19 — Portable/Network setups
+• Portable TeXstudio detection; network drive/UNC robustness; retry strategies
+M20 — TeXstudio session handling (low priority)
+• Optional save/restore sessions (only if stable, cross-version behavior can vary)
+M21 — Testing suite
+• Unit tests: process runner, command builders, discovery
+• Golden-file tests: log parser coverage (errors, warnings, hboxes, kpathsea)
+• Integration tests (feature-flagged)
+M22 — MCP server wiring
+• Add MCP server SDK; expose all tools with JSON schemas
+• Streaming outputs/events if client supports it
+M23 — Configuration & precedence
+• Config schema; precedence: env > user config > project config > defaults
+• Validation at startup; diagnostics tool for misconfig
+M24 — Documentation & examples
+• Client configuration snippet, usage examples, troubleshooting (MiKTeX on-demand, Perl for latexindent, PATH vs registry)
+• Version/compat matrix for TeXstudio flags and TeX distributions
+M25 — IDE-level features (future/complex)
+• Reference resolution, document outline extraction, symbol completion (beyond MVP; treat as separate track)
+1. Codebase creation summary
+Created a TypeScript project with the following key files and modules:
+• tsconfig.json (NodeNext ESM, strict)
+• package.json (scripts: build, start, dev; type: module)
+• src/utils/process.ts: safe spawn with timeouts and optional cancellation trigger
+• src/discovery/which.ts: cross-platform which
+• src/discovery/detect.ts: toolchain detection and version probing
+• src/parsers/latexLog.ts: baseline log parser to structured diagnostics
+• src/tools/latex.ts: compile and clean via latexmk with options
+• src/tools/texstudio.ts: open file/position in TeXstudio and availability check
+• src/tools/detect.ts: MCP-facing detect_toolchain adapter
+• src/tools/scaffold.ts: LaTeX project scaffolding
+• src/index.ts: temporary CLI stub (until MCP wiring)
+Documentation updated:
+• global_rules.md: security, OS compatibility, diagnostics, code quality, commit policy
+• ARCHITECTURE.md: component map and growth plan
+• API.md: MVP tool list and planned tools
+• PRD.md: product scope and NFRs
+• DEVELOPMENT.md: usage, scripts, next steps
+• CHANGELOG.md: initial scaffold entry
+Comprehensive .gitignore covers Node, OS/editor artifacts, and extensive LaTeX build products.
+1. How to build and verify locally
+• npm install
+• npm run build
+Quick checks with temporary CLI:
+• node dist/index.js health
+• node dist/index.js open path\to\file.tex 123
+• node dist/index.js compile path\to\main.tex
+• node dist/index.js clean path\to\main.tex
+These exercise detect_toolchain, TeXstudio open, latexmk compile/clean, and log parsing.
+1. Git setup and push
+A clean, single-step push via PowerShell sometimes fails if GitHub auth isn’t set. Run these commands in this folder:
+• git init
+• git add -A
+• git commit -m "feat: scaffold TypeScript project, core modules, docs, and CLI stub"
+• git branch -M main
+• git remote add origin https://github.com/axiomlogicnexus/TeXstudio-LaTeX-MCP-Tool.git
+• git push -u origin main
+If you see an authentication error, sign in with GitHub (e.g., gh auth login or set up a personal access token/credential manager) and re-run the push.
+Notes and next steps
+• The scaffold compiles successfully. MCP server wiring is scoped for a subsequent milestone (M22): add the MCP SDK, define JSON schemas, and expose the implemented tools.
+• The baseline log parser and tools are intended to be extended in M10–M12 for watch mode, advanced diagnostics, and project intelligence.
+• The documentation files reflect and enforce the global rules and architecture decisions made here.
+

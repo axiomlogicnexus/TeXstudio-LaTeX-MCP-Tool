@@ -1,0 +1,88 @@
+# Node
+node_modules/
+dist/
+.npm/
+package-lock.json
+
+# Env
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors & IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.history/
+
+# Coverage / build
+coverage/
+.build/
+output/
+_build/
+
+# LaTeX build artifacts
+*.aux
+*.auxlock
+*.bcf
+*.bbl
+*.blg
+*.brf
+*.idx
+*.ilg
+*.ind
+*.ist
+*.glg
+*.glo
+*.gls
+*.acn
+*.acr
+*.alg
+*.glsdefs
+*.fls
+*.fdb_latexmk
+*.fmt
+*.fot
+*.lof
+*.lot
+*.loe
+*.log
+*.lol
+*.lox
+*.nav
+*.out
+*.snm
+*.synctex
+*.synctex(busy)
+*.synctex.gz
+*.synctex.gz(busy)
+*.toc
+*.vrb
+*.xdv
+*.run.xml
+*.blx.bib
+*.thm
+*.aux.bak
+
+# PDF sync/metadata
+*.pdfsync
+
+# Temp
+~$*
+*.tmp
+*.temp
