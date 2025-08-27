@@ -218,39 +218,10 @@ Container workflows (Docker)
   - Quote arguments in CLI; MCP Inspector forms accept unescaped Windows paths
 
 
-## Roadmap snapshot
-- Completed through M23 (configuration tools and validation) with additional polish
-  - M14 OS discovery: complete
-  - M15 package helpers: complete
-  - M16 PDF post‑processing: complete
-  - M17 performance: caches and concurrency: complete
-  - M18 container support: complete
-  - M19 portable/network: complete
-  - M20 sessions: complete
-  - M21 test base: started
-  - M22 MCP wiring: complete
-  - M23 configuration & precedence: complete (config.show/validate/reload)
-
-
 ## License and attribution
 Recommended license: MIT (permissive, common in Node ecosystems). Add a LICENSE file with MIT if you want to publish publicly.
 
 Attributions: TeXstudio, MiKTeX, TeX Live, qpdf, Ghostscript, chktex, latexindent, biber, bibtex are third‑party tools subject to their respective licenses.
-
-
-## Versioning and tags
-Suggested tags:
-- v0.14.0 — M14 (OS discovery, distro info, long path support)
-- v0.15.0 — M15 (kpsewhich, texdoc, pkg tools)
-- v0.16.0 — M16 (pdf.optimize/info)
-- v0.17.0 — M17 (caches + concurrent chktex)
-- v0.18.0 — M18 (container)
-- v0.19.0 — M19 (portable/network)
-- v0.20.0 — M20 (sessions)
-- v0.21.0 — M21 (tests base)
-- v0.22.0 — M22 (MCP wiring)
-- v0.23.0 — M23 (config)
-- v0.23.1 — M23 additions (config.validate/reload), container shell‑escape policy, README/docs refresh
 
 
 ## Quick MCP Inspector setup
