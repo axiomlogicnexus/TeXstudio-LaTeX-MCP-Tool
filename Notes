@@ -6,3 +6,5 @@ chktex: Current output is returned raw. In a later milestone (advanced diagnosti
 
 
 exclude other generated artifacts, add them to .gitignore before running git add -A.
+
+Inform users about possible endpoint naming changes in previous and future versions

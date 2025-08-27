@@ -14,7 +14,7 @@ export async function queryWindowsAppPath(exeName: string): Promise<string | nul
   ];
   for (const k of keys) {
     try {
-      const res = await runCommand("reg", ["query", k.replaceAll("/", "\\"), "/ve"], { timeoutMs: 800 });
+      const res = await runCommand("reg", ["query", k.split("/").join("\\"), "/ve"], { timeoutMs: 800 });
       const text = (res.stdout || "") + "\n" + (res.stderr || "");
       const m = /REG_SZ\s+(.+)$/m.exec(text);
       if (m) {

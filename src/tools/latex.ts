@@ -11,6 +11,8 @@ import path from "node:path";
 import os from "node:os";
 import { runCommand } from "../utils/process.js";
 import { which } from "../discovery/which.js";
+import { resolveExec } from "../discovery/resolveExec.js";
+import { toExtendedIfNeeded } from "../utils/security.js";
 import { parseLatexLog, Diagnostic } from "../parsers/latexLog.js";
 
 // M13 helpers: workspace containment and shell-escape gating
@@ -74,7 +76,7 @@ async function runEngineOnce(engine: string, texPath: string, opts: CompileOptio
   if (opts.shellEscape) args.push("-shell-escape");
   if (opts.jobname) args.push("-jobname=" + opts.jobname);
   if (opts.outDir) args.push("-output-directory=" + path.resolve(opts.outDir));
-  args.push(path.resolve(texPath));
+  args.push(toExtendedIfNeeded(path.resolve(texPath)));
   const res = await runCommand(exe, args, { timeoutMs: 90_000 });
   return { code: res.code, stdout: res.stdout, stderr: res.stderr, command: res.command, args: res.args };
 }
@@ -84,7 +86,7 @@ async function runBiberIfNeeded(rootTex: string, outDir?: string): Promise<strin
   const dir = outDir ? path.resolve(outDir) : path.dirname(path.resolve(rootTex));
   const bcf = path.join(dir, base + ".bcf");
   if (!fs.existsSync(bcf)) return "";
-  const exe = which(os.platform() === "win32" ? "biber.exe" : "biber") || (os.platform() === "win32" ? "biber.exe" : "biber");
+  const exe = await resolveExec(os.platform() === "win32" ? "biber.exe" : "biber") || (os.platform() === "win32" ? "biber.exe" : "biber");
   const res = await runCommand(exe, [base], { cwd: dir, timeoutMs: 90_000 });
   return (res.stdout || "") + (res.stderr ? "\n" + res.stderr : "");
 }
@@ -96,7 +98,7 @@ async function runBibtexIfNeeded(rootTex: string, outDir?: string): Promise<stri
   if (!fs.existsSync(aux)) return "";
   const content = fs.readFileSync(aux, "utf8");
   if (!/\\citation|\\bibdata/.test(content)) return "";
-  const exe = which(os.platform() === "win32" ? "bibtex.exe" : "bibtex") || (os.platform() === "win32" ? "bibtex.exe" : "bibtex");
+  const exe = await resolveExec(os.platform() === "win32" ? "bibtex.exe" : "bibtex") || (os.platform() === "win32" ? "bibtex.exe" : "bibtex");
   const res = await runCommand(exe, [base], { cwd: dir, timeoutMs: 90_000 });
   return (res.stdout || "") + (res.stderr ? "\n" + res.stderr : "");
 }
@@ -137,7 +139,7 @@ async function compileWithEngineFallback(opts: CompileOptions): Promise<CompileR
 export async function compileLatex(opts: CompileOptions): Promise<CompileResult> {
   try {
     const ws = getWorkspaceRoot();
-    const latexmk = which(os.platform() === "win32" ? "latexmk.exe" : "latexmk");
+    const latexmk = await resolveExec(os.platform() === "win32" ? "latexmk.exe" : "latexmk");
 
     // If latexmk is not available, use engine fallback (will enforce workspace inside)
     if (!latexmk) {
@@ -159,7 +161,7 @@ export async function compileLatex(opts: CompileOptions): Promise<CompileResult>
     // Set engine selection for latexmk
     args.push("-e", `$pdflatex='${engine}'`);
     const root = ensureInsideWorkspace(opts.root, ws);
-    args.push(root);
+    args.push(toExtendedIfNeeded(root));
 
     const res = await runCommand(latexmk, args, { timeoutMs: 120_000 });
     const logText = (res.stdout || "") + "\n" + (res.stderr || "");
@@ -204,11 +206,11 @@ export async function compileLatex(opts: CompileOptions): Promise<CompileResult>
 
 export async function cleanAux(opts: { root: string; deep?: boolean; outDir?: string; }): Promise<{ cleaned: boolean; command: string; args: string[]; code: number | null; }> {
   const ws = getWorkspaceRoot();
-  const latexmk = which(os.platform() === "win32" ? "latexmk.exe" : "latexmk") || "latexmk";
+  const latexmk = (await resolveExec(os.platform() === "win32" ? "latexmk.exe" : "latexmk")) || "latexmk";
   const args: string[] = [];
   if (opts.outDir) { args.push("-outdir=" + ensureInsideWorkspace(opts.outDir, ws)); }
   args.push(opts.deep ? "-C" : "-c");
-  args.push(ensureInsideWorkspace(opts.root, ws));
+  args.push(toExtendedIfNeeded(ensureInsideWorkspace(opts.root, ws)));
   const res = await runCommand(latexmk, args, { timeoutMs: 30_000 });
   return { cleaned: res.code === 0, command: res.command, args: res.args, code: res.code };
 }
