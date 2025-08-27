@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { runCommand } from "../utils/process.js";
 import { resolveExec } from "../discovery/resolveExec.js";
-import { getWorkspaceRoot, ensureInsideWorkspace } from "../utils/security.js";
+import { getWorkspaceRoot, ensureInsideWorkspace, shellEscapeAllowed } from "../utils/security.js";
 import { loadConfig } from "../config/load.js";
 
 export async function container_info(): Promise<{ dockerAvailable: boolean; dockerPath: string | null; version?: string | null; images?: string[] }>
@@ -53,7 +53,9 @@ export async function compileLatexInContainer(args: CompileContainerArgs): Promi
   if (outRel) mk.push("-outdir=" + outRel);
   mk.push("-pdf");
   if (args.interaction) mk.push("-interaction=" + args.interaction); else mk.push("-interaction=nonstopmode");
-  if (args.shellEscape) mk.push("-shell-escape");
+  const requestedShell = !!args.shellEscape;
+  const allowShell = requestedShell && shellEscapeAllowed();
+  if (allowShell) mk.push("-shell-escape");
   if (args.jobname) mk.push("-jobname=" + args.jobname);
   const engine = args.engine || "pdflatex";
   mk.push("-e", `$pdflatex='${engine}'`);
@@ -70,7 +72,10 @@ export async function compileLatexInContainer(args: CompileContainerArgs): Promi
   ];
   const res = await runCommand(docker, argv, { timeoutMs: 180_000 });
   const success = res.code === 0;
-  return { success, stdout: res.stdout, stderr: res.stderr, command: docker, argv };
+  const warning = (requestedShell && !allowShell)
+    ? "[warning] shell-escape requested but blocked by policy (set TEX_MCP_ALLOW_SHELL_ESCAPE=1 to allow)\n"
+    : "";
+  return { success, stdout: warning + (res.stdout || ""), stderr: res.stderr, command: docker, argv };
 }
 
 export async function cleanAuxInContainer(args: { image?: string; root: string; deep?: boolean; outDir?: string; }): Promise<{ success: boolean; stdout: string; stderr: string; command: string; argv: string[] }>
