@@ -106,8 +106,8 @@ Milestones (ordered: most relevant/easiest first → least relevant/hardest)
 - [x] M23 — Configuration & precedence
   - Config schema; precedence: env > project file (.texstudio-mcp.json) > defaults ✔
   - Centralized policy/paths: workspaceRoot, allowShellEscape, defaultEngine, dockerImage, texstudioExe ✔
-  - MCP tool: config.show ✔
-  - Wired into texstudioPath (exe override), container (default image), latex (default engine, policy) ✔
+  - MCP tools: config.show, config.validate, config.reload ✔
+  - Wired into texstudioPath (exe override), container (default image + shell-escape policy), latex (default engine, policy) ✔
 
 - [ ] M24 — Documentation & examples
   - Client configuration, usage examples, troubleshooting
