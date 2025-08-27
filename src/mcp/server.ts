@@ -137,7 +137,8 @@ const OutOfDateInput = {
 const ChktexInput = {
   files: z.array(z.string()).nonempty().describe("List of .tex files to lint"),
   config: z.string().optional().describe("Path to chktexrc or config file"),
-  minSeverity: z.number().int().min(0).max(3).optional().describe("Minimum severity to report (0..3). Not all outputs include severities; tool will still run regardless")
+  minSeverity: z.number().int().min(0).max(3).optional().describe("Minimum severity to report (0..3). Not all outputs include severities; tool will still run regardless"),
+  structured: z.boolean().optional().describe("If true, return structured diagnostics parsed from chktex output")
 } as const;
 
 // format.latexindent
@@ -278,21 +279,41 @@ server.registerTool(
   "lint.chktex",
   {
     title: "Lint with ChkTeX",
-    description: "Run chktex on one or more files and return raw output",
+    description: "Run chktex on one or more files and return raw output or structured diagnostics",
     inputSchema: ChktexInput
   },
   async (args) => {
     try {
       const exe = which(process.platform === "win32" ? "chktex.exe" : "chktex") || (process.platform === "win32" ? "chktex.exe" : "chktex");
+
+      if (args.structured) {
+        const results: any[] = [];
+        for (const f of args.files) {
+          const fileArg = path.resolve(f);
+          const runArgs: string[] = [];
+          if (args.config) runArgs.push("-l", path.resolve(args.config));
+          // Quiet + custom format: file:line:col:message
+          runArgs.push("-q", "-f", "%f:%l:%c:%m\n", fileArg);
+          const res = await runCommand(exe, runArgs, { timeoutMs: 30_000 });
+          const lines = (res.stdout || "").split(/\r?\n/).filter(Boolean);
+          for (const line of lines) {
+            const parts = line.split(":");
+            const file = parts[0];
+            const lineNum = Number(parts[1] || 0) || undefined;
+            const colNum = Number(parts[2] || 0) || undefined;
+            const message = parts.slice(3).join(":").trim();
+            results.push({ file, line: lineNum, column: colNum, message, raw: line });
+          }
+        }
+        return { content: [{ type: "text", text: JSON.stringify({ diagnostics: results }, null, 2) }] };
+      }
+
+      // Default: raw output concatenated per file
       const allOutputs: string[] = [];
       for (const f of args.files) {
         const fileArg = path.resolve(f);
         const runArgs: string[] = [];
-        // Configure output format for easier parsing in the future
-        // Default simple output for now
-        if (args.config) {
-          runArgs.push("-l", path.resolve(args.config));
-        }
+        if (args.config) runArgs.push("-l", path.resolve(args.config));
         runArgs.push(fileArg);
         const res = await runCommand(exe, runArgs, { timeoutMs: 30_000 });
         allOutputs.push(`>>> ${fileArg}\n` + (res.stdout || "") + (res.stderr ? "\n" + res.stderr : ""));
@@ -493,6 +514,42 @@ server.registerTool(
   async (args) => {
     const res = computeOutOfDate(args);
     return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+// M12 — health.check
+server.registerTool(
+  "health.check",
+  {
+    title: "Environment health check",
+    description: "Report availability and versions of perl and key LaTeX tools"
+  },
+  async () => {
+    const isWin = process.platform === "win32";
+    const names = [
+      { key: "perl", win: "perl.exe", posix: "perl", flags: ["-v"] },
+      { key: "latexmk", win: "latexmk.exe", posix: "latexmk", flags: ["-v", "--version"] },
+      { key: "latexindent", win: "latexindent.exe", posix: "latexindent", flags: ["--version"] },
+      { key: "chktex", win: "chktex.exe", posix: "chktex", flags: ["--version"] },
+      { key: "biber", win: "biber.exe", posix: "biber", flags: ["--version"] },
+      { key: "bibtex", win: "bibtex.exe", posix: "bibtex", flags: ["--version"] },
+    ];
+    const items = await Promise.all(names.map(async (n) => {
+      const exeName = isWin ? n.win : n.posix;
+      const p = which(exeName) || which(n.posix);
+      let version: string | null = null;
+      if (p) {
+        for (const f of n.flags) {
+          try {
+            const r = await runCommand(p, [f], { timeoutMs: 1200 });
+            const first = (r.stdout || r.stderr).split(/\r?\n/)[0]?.trim();
+            if (first) { version = first; break; }
+          } catch {}
+        }
+      }
+      return { name: n.key, available: !!p, path: p || null, version };
+    }));
+    return { content: [{ type: "text", text: JSON.stringify({ tools: items }, null, 2) }] };
   }
 );
 
