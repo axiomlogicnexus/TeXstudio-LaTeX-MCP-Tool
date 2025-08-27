@@ -1,9 +1,8 @@
-latexindent: If MiKTeX lacks Perl or latexindent is missing components, the command may fail. The tool will return stdout/stderr; if needed, we can add a health check for Perl in a later milestone.
-latexindent health: As you mentioned, latexindent also depends on Perl. The current tool returns stdout/stderr; a dedicated health check for Perl can be added later (roadmap M13 or a small M12 addition if you want).
-Graph/parser: The project intelligence module is heuristic and conservative. We can expand patterns for more LaTeX ecosystems in a future milestone.
-
-
-
-
-[DELAYED]
 chktex: Current output is returned raw. In a later milestone (advanced diagnostics), we can parse chktex output lines into structured diagnostics for your MCP client.
+
+
+
+
+
+
+exclude other generated artifacts, add them to .gitignore before running git add -A.

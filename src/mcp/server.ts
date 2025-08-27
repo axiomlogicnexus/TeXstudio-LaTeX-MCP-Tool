@@ -34,7 +34,8 @@ import { which } from "../discovery/which.js";
 import { runCommand } from "../utils/process.js";
 import { forwardSearchHint } from "../tools/forwardSearch.js";
 import { startLatexWatch, stopLatexWatch, listWatches, tailWatchLog } from "../tools/watch.js";
-import { detectRoot, buildDependencyGraph, computeOutOfDate, expectedPdfPath } from "../tools/projectIntelligence.js";
+import { detectRoot, buildDependencyGraph, computeOutOfDate } from "../tools/projectIntelligence.js";
+import { getWorkspaceRoot, ensureInsideWorkspace } from "../utils/security.js";
 
 // ---------------------------------------------------------------------------
 // Zod Schemas for tool inputs
@@ -285,13 +286,14 @@ server.registerTool(
   async (args) => {
     try {
       const exe = which(process.platform === "win32" ? "chktex.exe" : "chktex") || (process.platform === "win32" ? "chktex.exe" : "chktex");
+      const ws = getWorkspaceRoot();
 
       if (args.structured) {
         const results: any[] = [];
         for (const f of args.files) {
-          const fileArg = path.resolve(f);
+          const fileArg = ensureInsideWorkspace(f, ws);
           const runArgs: string[] = [];
-          if (args.config) runArgs.push("-l", path.resolve(args.config));
+          if (args.config) runArgs.push("-l", ensureInsideWorkspace(args.config, ws));
           // Quiet + custom format: file:line:col:message
           runArgs.push("-q", "-f", "%f:%l:%c:%m\n", fileArg);
           const res = await runCommand(exe, runArgs, { timeoutMs: 30_000 });
@@ -311,9 +313,9 @@ server.registerTool(
       // Default: raw output concatenated per file
       const allOutputs: string[] = [];
       for (const f of args.files) {
-        const fileArg = path.resolve(f);
+        const fileArg = ensureInsideWorkspace(f, ws);
         const runArgs: string[] = [];
-        if (args.config) runArgs.push("-l", path.resolve(args.config));
+        if (args.config) runArgs.push("-l", ensureInsideWorkspace(args.config, ws));
         runArgs.push(fileArg);
         const res = await runCommand(exe, runArgs, { timeoutMs: 30_000 });
         allOutputs.push(`>>> ${fileArg}\n` + (res.stdout || "") + (res.stderr ? "\n" + res.stderr : ""));
@@ -337,13 +339,12 @@ server.registerTool(
   async (args) => {
     try {
       const exe = which(process.platform === "win32" ? "latexindent.exe" : "latexindent") || (process.platform === "win32" ? "latexindent.exe" : "latexindent");
+      const ws = getWorkspaceRoot();
       const runArgs: string[] = [];
       if (args.config) {
-        // latexindent reads -l localSettings.yaml in CWD; also supports -y for settings
-        // We pass -l and run from file directory for better behavior
-        runArgs.push("-l", path.resolve(args.config));
+        runArgs.push("-l", ensureInsideWorkspace(args.config, ws));
       }
-      const filePath = path.resolve(args.file);
+      const filePath = ensureInsideWorkspace(args.file, ws);
       if (args.inPlace) {
         runArgs.push("-w", filePath);
         const res = await runCommand(exe, runArgs, { timeoutMs: 60_000 });
@@ -373,7 +374,8 @@ server.registerTool(
     try {
       const exeName = args.tool === "biber" ? (process.platform === "win32" ? "biber.exe" : "biber") : (process.platform === "win32" ? "bibtex.exe" : "bibtex");
       const exe = which(exeName) || exeName;
-      const full = path.resolve(args.rootOrAux);
+      const ws = getWorkspaceRoot();
+      const full = ensureInsideWorkspace(args.rootOrAux, ws);
       const dir = path.dirname(full);
       const base = path.parse(full).name;
       const res = await runCommand(exe, [base], { timeoutMs: 60_000, env: process.env, cwd: dir });
@@ -484,7 +486,11 @@ server.registerTool(
     inputSchema: DetectRootInput
   },
   async (args) => {
-    const res = detectRoot(args);
+    const ws = getWorkspaceRoot();
+    const safe: any = { ...args };
+    if (args.startPath) safe.startPath = ensureInsideWorkspace(args.startPath, ws);
+    if (args.file) safe.file = ensureInsideWorkspace(args.file, ws);
+    const res = detectRoot(safe);
     return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
   }
 );
@@ -498,7 +504,9 @@ server.registerTool(
     inputSchema: GraphInput
   },
   async (args) => {
-    const res = buildDependencyGraph(args.root);
+    const ws = getWorkspaceRoot();
+    const root = ensureInsideWorkspace(args.root, ws);
+    const res = buildDependencyGraph(root);
     return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
   }
 );
@@ -512,7 +520,9 @@ server.registerTool(
     inputSchema: OutOfDateInput
   },
   async (args) => {
-    const res = computeOutOfDate(args);
+    const ws = getWorkspaceRoot();
+    const root = ensureInsideWorkspace(args.root, ws);
+    const res = computeOutOfDate({ ...args, root });
     return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
   }
 );

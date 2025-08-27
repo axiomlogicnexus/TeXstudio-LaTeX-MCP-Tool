@@ -58,11 +58,11 @@ Milestones (ordered: most relevant/easiest first → least relevant/hardest)
   - Categorize missing packages/files with actionable hints (install via tlmgr/miktex, fix paths, add \usepackage) ✔
   - Better kpathsea decoding and over/underfull location mapping ✔
 
-- [ ] M13 — Security & safety
-  - Path normalization and workspace containment
-  - Shell-escape whitelist; disabled by default
-  - Timeouts and resource limits; kill process tree on cancel
-  - Redact sensitive env in logs
+- [x] M13 — Security & safety
+  - Path normalization and workspace containment ✔ (applied to compile/clean, chktex, latexindent, bib.build, project.*)
+  - Shell-escape whitelist; disabled by default ✔ (policy via TEX_MCP_ALLOW_SHELL_ESCAPE)
+  - Timeouts and resource limits; kill process tree on cancel (timeouts in place; process-tree kill planned)
+  - Redact sensitive env in logs (planned)
 
 - [ ] M14 — OS-specific discovery robustness
   - Windows: registry fallback for TeXstudio/TeX distros; UNC/long path handling
