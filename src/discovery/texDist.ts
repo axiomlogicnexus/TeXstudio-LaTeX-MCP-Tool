@@ -27,7 +27,14 @@ async function getVersionFast(exe: string, flags: string[]): Promise<string | nu
   return null;
 }
 
+let _distCache: { at: number; info: TexDistInfo } | null = null;
+const DIST_TTL = 60_000;
+
 export async function detectTexDist(): Promise<TexDistInfo> {
+  const now = Date.now();
+  if (_distCache && (now - _distCache.at) < DIST_TTL) {
+    return _distCache.info;
+  }
   const isWin = os.platform() === "win32";
   // Restrict probing to key tools to minimize overhead
   const candidates = ["kpsewhich", "pdflatex", "latexmk", "biber", "bibtex"];
@@ -49,5 +56,7 @@ export async function detectTexDist(): Promise<TexDistInfo> {
   const any = tools.map(t => t.version || "").join("\n");
   if (/TeX Live/i.test(any)) { name = "TeX Live"; details = details || any.split("\n").find(l => /TeX Live/i.test(l)); }
 
-  return { name, details, tools };
+  const info = { name, details, tools } as TexDistInfo;
+  _distCache = { at: now, info };
+  return info;
 }

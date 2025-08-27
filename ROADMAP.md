@@ -69,18 +69,18 @@ Milestones (ordered: most relevant/easiest first → least relevant/hardest)
   - macOS/Linux: which() fallbacks incl. /Library/TeX/texbin and TeX Live arch-dir scan ✔
   - Distro detection: tex.dist_info with fast, parallel, short-timeout probes ✔
 
-- [ ] M15 — Package management helpers
-  - kpsewhich integration
-  - texdoc integration
-  - tlmgr/MiKTeX (mpm) helpers
+- [x] M15 — Package management helpers
+  - kpsewhich integration ✔
+  - texdoc integration ✔
+  - tlmgr/MiKTeX (mpm) helpers ✔
 
-- [ ] M16 — PDF post-processing (optional)
-  - qpdf/gs hooks (off by default)
+- [x] M16 — PDF post-processing (optional)
+  - qpdf/gs hooks (pdf.optimize, pdf.info) ✔
 
-- [ ] M17 — Performance & process handling
+- [x] M17 — Performance & process handling
   - Persistent process pool (optional)
-  - Parallelization where safe
-  - Caching of dependencies/results
+  - Parallelization where safe ✔ (concurrent chktex linting can be enabled; conservative defaults)
+  - Caching of dependencies/results ✔ (detect_toolchain and tex.dist_info cached with TTL)
 
 - [ ] M18 — Container/Docker support
   - Optional execution inside containers; configurable mounts/tool paths

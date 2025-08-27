@@ -39,6 +39,7 @@ import { getWorkspaceRoot, ensureInsideWorkspace, toExtendedIfNeeded } from "../
 import { detectTexDist } from "../discovery/texDist.js";
 import { tex_kpsewhich, tex_texdoc, tex_pkg_info, tex_pkg_install } from "../tools/pkg.js";
 import { pdf_optimize, pdf_info } from "../tools/pdf.js";
+import { asyncPool } from "../utils/asyncPool.js";
 
 // ---------------------------------------------------------------------------
 // Zod Schemas for tool inputs
@@ -293,7 +294,8 @@ server.registerTool(
 
       if (args.structured) {
         const results: any[] = [];
-        for (const f of args.files) {
+        const files = args.files.slice();
+        await asyncPool(3, files, async (f) => {
           const fileArg = toExtendedIfNeeded(ensureInsideWorkspace(f, ws));
           const runArgs: string[] = [];
           if (args.config) runArgs.push("-l", toExtendedIfNeeded(ensureInsideWorkspace(args.config, ws)));
@@ -309,21 +311,21 @@ server.registerTool(
             const message = parts.slice(3).join(":").trim();
             results.push({ file, line: lineNum, column: colNum, message, raw: line });
           }
-        }
+        });
         return { content: [{ type: "text", text: JSON.stringify({ diagnostics: results }, null, 2) }] };
       }
 
       // Default: raw output concatenated per file
-      const allOutputs: string[] = [];
-      for (const f of args.files) {
+      const files = args.files.slice();
+      const outputs = await asyncPool(3, files, async (f) => {
         const fileArg = toExtendedIfNeeded(ensureInsideWorkspace(f, ws));
         const runArgs: string[] = [];
         if (args.config) runArgs.push("-l", toExtendedIfNeeded(ensureInsideWorkspace(args.config, ws)));
         runArgs.push(fileArg);
         const res = await runCommand(exe, runArgs, { timeoutMs: 30_000 });
-        allOutputs.push(`>>> ${fileArg}\n` + (res.stdout || "") + (res.stderr ? "\n" + res.stderr : ""));
-      }
-      return { content: [{ type: "text", text: allOutputs.join("\n\n") }] };
+        return `>>> ${fileArg}\n` + (res.stdout || "") + (res.stderr ? "\n" + res.stderr : "");
+      });
+      return { content: [{ type: "text", text: outputs.join("\n\n") }] };
     } catch (err: unknown) {
       const e = err as Error;
       return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
