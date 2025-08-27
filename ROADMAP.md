@@ -64,10 +64,10 @@ Milestones (ordered: most relevant/easiest first → least relevant/hardest)
   - Timeouts and resource limits; kill process tree on cancel (timeouts in place; process-tree kill planned)
   - Redact sensitive env in logs (planned)
 
-- [ ] M14 — OS-specific discovery robustness
-  - Windows: registry fallback for TeXstudio/TeX distros; UNC/long path handling
-  - macOS: app bundle resolution
-  - Linux: which/distro quirks
+- [x] M14 — OS-specific discovery robustness
+  - Windows: registry fallback (App Paths) for TeX tools; UNC/long path handling via toExtendedIfNeeded across tools ✔
+  - macOS/Linux: which() fallbacks incl. /Library/TeX/texbin and TeX Live arch-dir scan ✔
+  - Distro detection: tex.dist_info with fast, parallel, short-timeout probes ✔
 
 - [ ] M15 — Package management helpers
   - kpsewhich integration

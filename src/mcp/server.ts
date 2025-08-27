@@ -37,6 +37,7 @@ import { startLatexWatch, stopLatexWatch, listWatches, tailWatchLog } from "../t
 import { detectRoot, buildDependencyGraph, computeOutOfDate } from "../tools/projectIntelligence.js";
 import { getWorkspaceRoot, ensureInsideWorkspace, toExtendedIfNeeded } from "../utils/security.js";
 import { detectTexDist } from "../discovery/texDist.js";
+import { tex_kpsewhich, tex_texdoc, tex_pkg_info, tex_pkg_install } from "../tools/pkg.js";
 
 // ---------------------------------------------------------------------------
 // Zod Schemas for tool inputs
@@ -574,6 +575,59 @@ server.registerTool(
   async () => {
     const info = await detectTexDist();
     return { content: [{ type: "text", text: JSON.stringify(info, null, 2) }] };
+  }
+);
+
+// M15 — package and documentation helpers
+server.registerTool(
+  "tex.kpsewhich",
+  {
+    title: "kpsewhich lookup",
+    description: "Locate files in TeX tree",
+    inputSchema: { file: z.string(), format: z.string().optional() }
+  },
+  async (args) => {
+    const res = await tex_kpsewhich(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+server.registerTool(
+  "tex.texdoc",
+  {
+    title: "texdoc lookup",
+    description: "List documentation candidates for a package",
+    inputSchema: { package: z.string(), listOnly: z.boolean().optional() }
+  },
+  async (args) => {
+    const res = await tex_texdoc(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+server.registerTool(
+  "tex.pkg_info",
+  {
+    title: "Package info",
+    description: "Show package information via tlmgr or mpm",
+    inputSchema: { name: z.string() }
+  },
+  async (args) => {
+    const res = await tex_pkg_info(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+server.registerTool(
+  "tex.pkg_install",
+  {
+    title: "Package install",
+    description: "Install a package via tlmgr or mpm (dry-run optional)",
+    inputSchema: { name: z.string(), manager: z.enum(["tlmgr","mpm"]).optional(), dryRun: z.boolean().optional() }
+  },
+  async (args) => {
+    const res = await tex_pkg_install(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
   }
 );
 

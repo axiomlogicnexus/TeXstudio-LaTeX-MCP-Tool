@@ -1,8 +1,3 @@
-chktex: Current output is returned raw. In a later milestone (advanced diagnostics), we can parse chktex output lines into structured diagnostics for your MCP client.
-
-
-
-
 
 
 exclude other generated artifacts, add them to .gitignore before running git add -A.
