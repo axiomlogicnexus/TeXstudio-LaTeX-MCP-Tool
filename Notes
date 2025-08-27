@@ -7,3 +7,7 @@ Inform users about possible endpoint naming changes in previous and future versi
 Persistent process pool for external tools
 Merit: low (≈30–40%) for this workload. Most tools we call are short-lived, and maintaining persistent child processes yields marginal gains while increasing complexity (lifecycle management, cross-OS stability). On Windows especially, pooling stdin/stdout workers for these specific utilities isn’t commonly beneficial.
 Decision: defer. Not implemented; keep as optional for a future measurement-driven iteration.
+
+Notes for Docker Desktop on Windows
+
+Ensure drive sharing is enabled for the drive that contains your workspace (e.g., C:) so the mount -v C:\Users\Anthracite Ace:/work works.

@@ -40,6 +40,7 @@ import { detectTexDist } from "../discovery/texDist.js";
 import { tex_kpsewhich, tex_texdoc, tex_pkg_info, tex_pkg_install } from "../tools/pkg.js";
 import { pdf_optimize, pdf_info } from "../tools/pdf.js";
 import { asyncPool } from "../utils/asyncPool.js";
+import { container_info, compileLatexInContainer, cleanAuxInContainer } from "../tools/container.js";
 
 // ---------------------------------------------------------------------------
 // Zod Schemas for tool inputs
@@ -644,6 +645,45 @@ server.registerTool(
   },
   async (args) => {
     const res = await pdf_optimize(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+// M18 — Container/Docker support
+server.registerTool(
+  "container.info",
+  {
+    title: "Container info",
+    description: "Detect Docker availability and list images (short)"
+  },
+  async () => {
+    const info = await container_info();
+    return { content: [{ type: "text", text: JSON.stringify(info, null, 2) }] };
+  }
+);
+
+server.registerTool(
+  "latex.compile_container",
+  {
+    title: "Compile LaTeX in container",
+    description: "Run latexmk inside Docker with workspace mounted",
+    inputSchema: { image: z.string().optional(), root: z.string(), engine: z.enum(["pdflatex","xelatex","lualatex"]).optional(), outDir: z.string().optional(), shellEscape: z.boolean().optional(), interaction: z.enum(["batchmode","nonstopmode","scrollmode","errorstopmode"]).optional(), jobname: z.string().optional() }
+  },
+  async (args) => {
+    const res = await compileLatexInContainer(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+server.registerTool(
+  "latex.clean_container",
+  {
+    title: "Clean LaTeX aux files in container",
+    description: "Run latexmk -c/-C inside Docker",
+    inputSchema: { image: z.string().optional(), root: z.string(), deep: z.boolean().optional(), outDir: z.string().optional() }
+  },
+  async (args) => {
+    const res = await cleanAuxInContainer(args);
     return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
   }
 );
