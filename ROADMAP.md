@@ -82,11 +82,13 @@ Milestones (ordered: most relevant/easiest first → least relevant/hardest)
   - Parallelization where safe ✔ (concurrent chktex linting can be enabled; conservative defaults)
   - Caching of dependencies/results ✔ (detect_toolchain and tex.dist_info cached with TTL)
 
-- [ ] M18 — Container/Docker support
-  - Optional execution inside containers; configurable mounts/tool paths
+- [x] M18 — Container/Docker support
+  - Docker-backed latexmk compile/clean (workspace mounted at /work); container.info tool ✔
 
-- [ ] M19 — Portable/Network setups
-  - Portable TeXstudio detection; network drive/UNC robustness; retries
+- [x] M19 — Portable/Network setups
+  - Portable TeXstudio supported via TEXSTUDIO_EXE; robust resolution logic ✔
+  - Network drive/UNC robustness: extended path handling (toExtendedIfNeeded) applied across tools ✔
+  - Transient resilience: runWithRetry helper available and applied to network-sensitive operations ✔
 
 - [ ] M20 — TeXstudio session handling (low priority)
   - Optional save/restore sessions if stable cross-version

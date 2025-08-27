@@ -41,6 +41,7 @@ import { tex_kpsewhich, tex_texdoc, tex_pkg_info, tex_pkg_install } from "../too
 import { pdf_optimize, pdf_info } from "../tools/pdf.js";
 import { asyncPool } from "../utils/asyncPool.js";
 import { container_info, compileLatexInContainer, cleanAuxInContainer } from "../tools/container.js";
+import { saveSession, restoreSession } from "../tools/session.js";
 
 // ---------------------------------------------------------------------------
 // Zod Schemas for tool inputs
@@ -645,6 +646,33 @@ server.registerTool(
   },
   async (args) => {
     const res = await pdf_optimize(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+// M20 — TeXstudio session handling (MCP-managed)
+server.registerTool(
+  "session.save",
+  {
+    title: "Save session",
+    description: "Save a list of files (and cursor positions) as a session JSON under WORKSPACE_ROOT/.mcp_sessions",
+    inputSchema: { name: z.string(), entries: z.array(z.object({ file: z.string(), line: z.number().int().optional(), column: z.number().int().optional(), master: z.string().optional(), noSession: z.boolean().optional(), newInstance: z.boolean().optional() })) }
+  },
+  async (args) => {
+    const res = await saveSession(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+server.registerTool(
+  "session.restore",
+  {
+    title: "Restore session",
+    description: "Restore a session by opening files in TeXstudio",
+    inputSchema: { name: z.string() }
+  },
+  async (args) => {
+    const res = await restoreSession(args);
     return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
   }
 );

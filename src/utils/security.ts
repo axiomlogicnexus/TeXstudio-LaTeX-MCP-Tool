@@ -40,3 +40,9 @@ export function toExtendedIfNeeded(p: string): string {
   }
   return "\\\\?\\" + abs;
 }
+
+export function isLikelyNetworkPath(p: string | null): boolean {
+  if (!p) return false;
+  const abs = path.resolve(p);
+  return abs.startsWith("\\\\") || abs.startsWith("\\\\?\\UNC\\");
+}
