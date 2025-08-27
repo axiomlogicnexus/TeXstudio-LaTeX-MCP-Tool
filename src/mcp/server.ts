@@ -35,7 +35,7 @@ import { runCommand } from "../utils/process.js";
 import { forwardSearchHint } from "../tools/forwardSearch.js";
 import { startLatexWatch, stopLatexWatch, listWatches, tailWatchLog } from "../tools/watch.js";
 import { detectRoot, buildDependencyGraph, computeOutOfDate } from "../tools/projectIntelligence.js";
-import { getWorkspaceRoot, ensureInsideWorkspace } from "../utils/security.js";
+import { getWorkspaceRoot, ensureInsideWorkspace, toExtendedIfNeeded } from "../utils/security.js";
 import { detectTexDist } from "../discovery/texDist.js";
 
 // ---------------------------------------------------------------------------
@@ -292,9 +292,9 @@ server.registerTool(
       if (args.structured) {
         const results: any[] = [];
         for (const f of args.files) {
-          const fileArg = ensureInsideWorkspace(f, ws);
+          const fileArg = toExtendedIfNeeded(ensureInsideWorkspace(f, ws));
           const runArgs: string[] = [];
-          if (args.config) runArgs.push("-l", ensureInsideWorkspace(args.config, ws));
+          if (args.config) runArgs.push("-l", toExtendedIfNeeded(ensureInsideWorkspace(args.config, ws)));
           // Quiet + custom format: file:line:col:message
           runArgs.push("-q", "-f", "%f:%l:%c:%m\n", fileArg);
           const res = await runCommand(exe, runArgs, { timeoutMs: 30_000 });
@@ -314,9 +314,9 @@ server.registerTool(
       // Default: raw output concatenated per file
       const allOutputs: string[] = [];
       for (const f of args.files) {
-        const fileArg = ensureInsideWorkspace(f, ws);
+        const fileArg = toExtendedIfNeeded(ensureInsideWorkspace(f, ws));
         const runArgs: string[] = [];
-        if (args.config) runArgs.push("-l", ensureInsideWorkspace(args.config, ws));
+        if (args.config) runArgs.push("-l", toExtendedIfNeeded(ensureInsideWorkspace(args.config, ws)));
         runArgs.push(fileArg);
         const res = await runCommand(exe, runArgs, { timeoutMs: 30_000 });
         allOutputs.push(`>>> ${fileArg}\n` + (res.stdout || "") + (res.stderr ? "\n" + res.stderr : ""));
@@ -343,9 +343,9 @@ server.registerTool(
       const ws = getWorkspaceRoot();
       const runArgs: string[] = [];
       if (args.config) {
-        runArgs.push("-l", ensureInsideWorkspace(args.config, ws));
+        runArgs.push("-l", toExtendedIfNeeded(ensureInsideWorkspace(args.config, ws)));
       }
-      const filePath = ensureInsideWorkspace(args.file, ws);
+      const filePath = toExtendedIfNeeded(ensureInsideWorkspace(args.file, ws));
       if (args.inPlace) {
         runArgs.push("-w", filePath);
         const res = await runCommand(exe, runArgs, { timeoutMs: 60_000 });
@@ -376,7 +376,7 @@ server.registerTool(
       const exeName = args.tool === "biber" ? (process.platform === "win32" ? "biber.exe" : "biber") : (process.platform === "win32" ? "bibtex.exe" : "bibtex");
       const exe = which(exeName) || exeName;
       const ws = getWorkspaceRoot();
-      const full = ensureInsideWorkspace(args.rootOrAux, ws);
+      const full = toExtendedIfNeeded(ensureInsideWorkspace(args.rootOrAux, ws));
       const dir = path.dirname(full);
       const base = path.parse(full).name;
       const res = await runCommand(exe, [base], { timeoutMs: 60_000, env: process.env, cwd: dir });
@@ -506,7 +506,7 @@ server.registerTool(
   },
   async (args) => {
     const ws = getWorkspaceRoot();
-    const root = ensureInsideWorkspace(args.root, ws);
+    const root = toExtendedIfNeeded(ensureInsideWorkspace(args.root, ws));
     const res = buildDependencyGraph(root);
     return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
   }
@@ -522,7 +522,7 @@ server.registerTool(
   },
   async (args) => {
     const ws = getWorkspaceRoot();
-    const root = ensureInsideWorkspace(args.root, ws);
+    const root = toExtendedIfNeeded(ensureInsideWorkspace(args.root, ws));
     const res = computeOutOfDate({ ...args, root });
     return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
   }
