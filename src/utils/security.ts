@@ -27,3 +27,16 @@ export function isInsideWorkspace(p: string, root: string | null): boolean {
     return false;
   }
 }
+
+// Convert Windows paths to extended-length syntax when needed.
+// For simplicity and robustness with long/UNC paths, we convert unconditionally on Windows.
+export function toExtendedIfNeeded(p: string): string {
+  if (process.platform !== "win32") return p;
+  let abs = path.resolve(p);
+  if (abs.startsWith("\\\\?\\")) return abs; // already extended
+  if (abs.startsWith("\\\\")) {
+    // UNC path \\server\share -> \\?\UNC\server\share
+    return "\\\\?\\UNC\\" + abs.slice(2);
+  }
+  return "\\\\?\\" + abs;
+}

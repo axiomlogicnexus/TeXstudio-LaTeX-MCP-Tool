@@ -27,6 +27,7 @@ export function which(command: string): string | null {
   const isWin = os.platform() === "win32";
   const exts = isWin ? (process.env.PATHEXT || ".EXE;.CMD;.BAT").split(";") : [""];
 
+  // Try PATH first
   for (const seg of segments) {
     const base = seg || ".";
     if (isWin) {
@@ -50,13 +51,41 @@ export function which(command: string): string | null {
       "/Library/TeX/texbin",      // macOS TeX Live (symlink)
       "/usr/texbin",              // older macOS
       "/opt/texbin",              // macOS alternate
-      "/usr/local/texlive/bin",   // TeX Live root (needs arch subdir; users may symlink)
+      "/usr/local/texlive/bin",   // TeX Live root (arch subdir usually required)
       "/usr/local/bin",
       "/usr/bin"
     ];
     for (const d of extraDirs) {
       const p = path.join(d, command);
       if (exists(p)) return p;
+    }
+    // TeX Live arch subdir scan under /usr/local/texlive/bin
+    const tlRoot = "/usr/local/texlive/bin";
+    if (exists(tlRoot)) {
+      try {
+        const archDirs = fs.readdirSync(tlRoot, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name);
+        for (const a of archDirs) {
+          const p = path.join(tlRoot, a, command);
+          if (exists(p)) return p;
+        }
+      } catch {}
+    }
+  } else {
+    // Windows fallbacks: common MiKTeX and TeX Live locations
+    const winDirs = [
+      "C:\\\\Program Files\\\\MiKTeX\\\\miktex\\\\bin\\\\x64",
+      "C:\\\\Program Files\\\\MiKTeX 2.9\\\\miktex\\\\bin\\\\x64",
+      "C:\\\\Program Files (x86)\\\\MiKTeX 2.9\\\\miktex\\\\bin",
+      "C:\\\\texlive\\\\2024\\\\bin\\\\win32",
+      "C:\\\\texlive\\\\2023\\\\bin\\\\win32",
+      "C:\\\\texlive\\\\2022\\\\bin\\\\win32",
+      "C:\\\\texlive\\\\bin\\\\win32"
+    ];
+    for (const d of winDirs) {
+      for (const ext of exts) {
+        const p = path.join(d, command.toLowerCase().endsWith(ext.toLowerCase()) ? command : command + ext.toLowerCase());
+        if (exists(p)) return p;
+      }
     }
   }
 
