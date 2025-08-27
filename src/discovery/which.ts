@@ -2,6 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
+function exists(p: string): boolean {
+  try { fs.accessSync(p, fs.constants.F_OK); return true; } catch { return false; }
+}
+
 function isExecutable(p: string): boolean {
   try {
     fs.accessSync(p, fs.constants.X_OK);
@@ -39,5 +43,22 @@ export function which(command: string): string | null {
       if (fs.existsSync(p) && isExecutable(p)) return p;
     }
   }
+
+  // POSIX fallbacks for TeX installations not on PATH
+  if (!isWin) {
+    const extraDirs = [
+      "/Library/TeX/texbin",      // macOS TeX Live (symlink)
+      "/usr/texbin",              // older macOS
+      "/opt/texbin",              // macOS alternate
+      "/usr/local/texlive/bin",   // TeX Live root (needs arch subdir; users may symlink)
+      "/usr/local/bin",
+      "/usr/bin"
+    ];
+    for (const d of extraDirs) {
+      const p = path.join(d, command);
+      if (exists(p)) return p;
+    }
+  }
+
   return null;
 }

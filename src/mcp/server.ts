@@ -36,6 +36,7 @@ import { forwardSearchHint } from "../tools/forwardSearch.js";
 import { startLatexWatch, stopLatexWatch, listWatches, tailWatchLog } from "../tools/watch.js";
 import { detectRoot, buildDependencyGraph, computeOutOfDate } from "../tools/projectIntelligence.js";
 import { getWorkspaceRoot, ensureInsideWorkspace } from "../utils/security.js";
+import { detectTexDist } from "../discovery/texDist.js";
 
 // ---------------------------------------------------------------------------
 // Zod Schemas for tool inputs
