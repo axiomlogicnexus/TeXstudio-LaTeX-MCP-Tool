@@ -38,6 +38,7 @@ import { detectRoot, buildDependencyGraph, computeOutOfDate } from "../tools/pro
 import { getWorkspaceRoot, ensureInsideWorkspace, toExtendedIfNeeded } from "../utils/security.js";
 import { detectTexDist } from "../discovery/texDist.js";
 import { tex_kpsewhich, tex_texdoc, tex_pkg_info, tex_pkg_install } from "../tools/pkg.js";
+import { pdf_optimize, pdf_info } from "../tools/pdf.js";
 
 // ---------------------------------------------------------------------------
 // Zod Schemas for tool inputs
@@ -627,6 +628,33 @@ server.registerTool(
   },
   async (args) => {
     const res = await tex_pkg_install(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+// M16 — PDF post-processing
+server.registerTool(
+  "pdf.optimize",
+  {
+    title: "Optimize/linearize PDF",
+    description: "Optimize PDF via qpdf if available (fallback ghostscript)",
+    inputSchema: { input: z.string(), output: z.string().optional(), method: z.enum(["auto","qpdf","ghostscript"]).optional(), linearize: z.boolean().optional(), gsQuality: z.enum(["default","screen","ebook","printer","prepress"]).optional() }
+  },
+  async (args) => {
+    const res = await pdf_optimize(args);
+    return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+server.registerTool(
+  "pdf.info",
+  {
+    title: "PDF info",
+    description: "Basic PDF info (pages via qpdf if available)",
+    inputSchema: { input: z.string() }
+  },
+  async (args) => {
+    const res = await pdf_info(args);
     return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
   }
 );
