@@ -1,4 +1,4 @@
-# TeXstudio LaTeX MCP Tool
+# TeXstudio LaTeX MCP Server
 
 A cross‑platform Model Context Protocol (MCP) server that integrates TeXstudio editor entry points with the LaTeX toolchain for robust authoring, compilation, diagnostics, linting, formatting, bibliography management, project intelligence, PDF post‑processing, and optional containerized workflows.
 
