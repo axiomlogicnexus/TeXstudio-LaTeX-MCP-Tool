@@ -564,6 +564,19 @@ server.registerTool(
   }
 );
 
+// M14 — tex.dist_info
+server.registerTool(
+  "tex.dist_info",
+  {
+    title: "TeX distribution info",
+    description: "Detect TeX distribution (MiKTeX or TeX Live) and tool versions"
+  },
+  async () => {
+    const info = await detectTexDist();
+    return { content: [{ type: "text", text: JSON.stringify(info, null, 2) }] };
+  }
+);
+
 // ---------------------------------------------------------------------------
 // Connect to stdio transport
 // ---------------------------------------------------------------------------

@@ -1,5 +1,10 @@
 /**
  * TeX distribution detection (MiKTeX vs TeX Live) and basic info.
+ *
+ * Optimized to avoid client timeouts:
+ * - Short per-probe timeouts (≈600ms)
+ * - Limited tool set for version probing
+ * - Parallel execution with Promise.allSettled
  */
 import os from "node:os";
 import { which } from "./which.js";
@@ -11,31 +16,30 @@ export interface TexDistInfo {
   tools: { name: string; path: string | null; version?: string | null }[];
 }
 
-async function getVersion(exe: string, flag: string): Promise<string | null> {
-  try {
-    const r = await runCommand(exe, [flag], { timeoutMs: 1200 });
-    const first = (r.stdout || r.stderr).split(/\r?\n/)[0]?.trim();
-    return first || null;
-  } catch { return null; }
+async function getVersionFast(exe: string, flags: string[]): Promise<string | null> {
+  for (const f of flags) {
+    try {
+      const r = await runCommand(exe, [f], { timeoutMs: 600 });
+      const first = (r.stdout || r.stderr).split(/\r?\n/)[0]?.trim();
+      if (first) return first;
+    } catch {}
+  }
+  return null;
 }
 
 export async function detectTexDist(): Promise<TexDistInfo> {
   const isWin = os.platform() === "win32";
-  const candidates = [
-    "kpsewhich",
-    "pdflatex",
-    "xelatex",
-    "lualatex",
-    "latexmk",
-    "biber",
-    "bibtex"
-  ];
-  const tools: { name: string; path: string | null; version?: string | null }[] = [];
-  for (const n of candidates) {
+  // Restrict probing to key tools to minimize overhead
+  const candidates = ["kpsewhich", "pdflatex", "latexmk", "biber", "bibtex"];
+
+  const probes = candidates.map(async (n) => {
     const exe = which(isWin ? `${n}.exe` : n) || which(n);
-    const version = exe ? (await getVersion(exe, "--version") || await getVersion(exe, "-v")) : null;
-    tools.push({ name: n, path: exe || null, version });
-  }
+    const version = exe ? await getVersionFast(exe, ["--version", "-v"]) : null;
+    return { name: n, path: exe || null, version };
+  });
+
+  const settled = await Promise.allSettled(probes);
+  const tools = settled.map(s => s.status === "fulfilled" ? s.value : { name: "unknown", path: null, version: null });
 
   // Decide distribution by kpsewhich output or version banners
   let name: TexDistInfo["name"] = "Unknown";
