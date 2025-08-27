@@ -13,6 +13,28 @@ import { runCommand } from "../utils/process.js";
 import { which } from "../discovery/which.js";
 import { parseLatexLog, Diagnostic } from "../parsers/latexLog.js";
 
+// M13 helpers: workspace containment and shell-escape gating
+function getWorkspaceRoot(): string | null {
+  const r = process.env.WORKSPACE_ROOT;
+  return r ? path.resolve(r) : null;
+}
+
+function ensureInsideWorkspace(p: string, root: string | null): string {
+  const abs = path.resolve(p);
+  if (!root) return abs; // no enforcement if root not defined
+  const normAbs = path.normalize(abs);
+  const normRoot = path.normalize(root);
+  if (normAbs.toLowerCase().startsWith(normRoot.toLowerCase() + path.sep) || normAbs.toLowerCase() === normRoot.toLowerCase()) {
+    return abs;
+  }
+  throw new Error(`Path escapes workspace root: ${abs} (root=${root})`);
+}
+
+function shellEscapeAllowed(): boolean {
+  const v = (process.env.TEX_MCP_ALLOW_SHELL_ESCAPE || "").toLowerCase();
+  return v === "1" || v === "true" || v === "on" || v === "yes";
+}
+
 export interface CompileOptions {
   root: string;
   engine?: "pdflatex" | "xelatex" | "lualatex";
@@ -80,8 +102,9 @@ async function runBibtexIfNeeded(rootTex: string, outDir?: string): Promise<stri
 }
 
 async function compileWithEngineFallback(opts: CompileOptions): Promise<CompileResult> {
+  const ws = getWorkspaceRoot();
   const engine = opts.engine || "pdflatex";
-  const root = path.resolve(opts.root);
+  const root = ensureInsideWorkspace(opts.root, ws);
   let combined = "";
 
   // First pass
@@ -112,53 +135,80 @@ async function compileWithEngineFallback(opts: CompileOptions): Promise<CompileR
 }
 
 export async function compileLatex(opts: CompileOptions): Promise<CompileResult> {
-  const latexmk = which(os.platform() === "win32" ? "latexmk.exe" : "latexmk");
+  try {
+    const ws = getWorkspaceRoot();
+    const latexmk = which(os.platform() === "win32" ? "latexmk.exe" : "latexmk");
 
-  // If latexmk is not available, use engine fallback
-  if (!latexmk) {
-    return await compileWithEngineFallback(opts);
+    // If latexmk is not available, use engine fallback (will enforce workspace inside)
+    if (!latexmk) {
+      return await compileWithEngineFallback(opts);
+    }
+
+    const args: string[] = [];
+    const outDir = opts.outDir ? ensureInsideWorkspace(opts.outDir, ws) : undefined;
+    if (outDir) { args.push("-outdir=" + outDir); }
+    if (opts.synctex !== false) { args.push("-synctex=1"); }
+    const requestedShell = !!opts.shellEscape;
+    const allowShell = requestedShell && shellEscapeAllowed();
+    if (allowShell) { args.push("-shell-escape"); }
+    if (opts.haltOnError) { args.push("-halt-on-error"); }
+    if (opts.jobname) { args.push("-jobname=" + opts.jobname); }
+    const engine = opts.engine || "pdflatex";
+    args.push("-pdf");
+    args.push("-interaction=" + (opts.interaction || "nonstopmode"));
+    // Set engine selection for latexmk
+    args.push("-e", `$pdflatex='${engine}'`);
+    const root = ensureInsideWorkspace(opts.root, ws);
+    args.push(root);
+
+    const res = await runCommand(latexmk, args, { timeoutMs: 120_000 });
+    const logText = (res.stdout || "") + "\n" + (res.stderr || "");
+    const diagnostics = parseLatexLog(logText);
+
+    // Inject missing-perl diagnostic if detected
+    if (detectMissingPerl(logText)) {
+      diagnostics.push({
+        type: "error",
+        message: "MiKTeX could not find the script engine 'perl' required by latexmk.",
+        code: "missing-perl",
+        hint: "Install Strawberry Perl (https://strawberryperl.com/) and ensure perl is on PATH, or follow MiKTeX KB: https://miktex.org/kb/fix-script-engine-not-found"
+      });
+    }
+
+    // Warn if shell-escape was requested but blocked by policy
+    if (requestedShell && !allowShell) {
+      diagnostics.push({
+        type: "warning",
+        message: "shell-escape requested but blocked by policy",
+        code: "shell-escape-blocked",
+        hint: "Set TEX_MCP_ALLOW_SHELL_ESCAPE=1 to allow, and ensure you trust the document."
+      });
+    }
+
+    const pdfPath = outDir ? path.join(outDir, (opts.jobname || path.parse(root).name) + ".pdf") : path.join(path.dirname(root), (opts.jobname || path.parse(root).name) + ".pdf");
+    const success = (res.code === 0) && diagnostics.filter(d => d.type === "error").length === 0;
+    return { success, pdfPath, diagnostics, rawLog: logText, command: res.command, args: res.args, code: res.code };
+  } catch (e: any) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      success: false,
+      pdfPath: undefined,
+      diagnostics: [{ type: "error", message: msg, code: "compile-error" }],
+      rawLog: undefined,
+      command: "latexmk",
+      args: [],
+      code: null,
+    };
   }
-
-  const args: string[] = [];
-  const outDir = opts.outDir ? path.resolve(opts.outDir) : undefined;
-  if (outDir) { args.push("-outdir=" + outDir); }
-  if (opts.synctex !== false) { args.push("-synctex=1"); }
-  if (opts.shellEscape) { args.push("-shell-escape"); }
-  if (opts.haltOnError) { args.push("-halt-on-error"); }
-  if (opts.jobname) { args.push("-jobname=" + opts.jobname); }
-  const engine = opts.engine || "pdflatex";
-  args.push("-pdf");
-  args.push("-interaction=" + (opts.interaction || "nonstopmode"));
-  // Set engine selection for latexmk
-  args.push("-e", `$pdflatex='${engine}'`);
-  const root = path.resolve(opts.root);
-  args.push(root);
-
-  const res = await runCommand(latexmk, args, { timeoutMs: 120_000 });
-  const logText = (res.stdout || "") + "\n" + (res.stderr || "");
-  const diagnostics = parseLatexLog(logText);
-
-  // Inject missing-perl diagnostic if detected
-  if (detectMissingPerl(logText)) {
-    diagnostics.push({
-      type: "error",
-      message: "MiKTeX could not find the script engine 'perl' required by latexmk.",
-      code: "missing-perl",
-      hint: "Install Strawberry Perl (https://strawberryperl.com/) and ensure perl is on PATH, or follow MiKTeX KB: https://miktex.org/kb/fix-script-engine-not-found"
-    });
-  }
-
-  const pdfPath = outDir ? path.join(outDir, (opts.jobname || path.parse(root).name) + ".pdf") : path.join(path.dirname(root), (opts.jobname || path.parse(root).name) + ".pdf");
-  const success = (res.code === 0) && diagnostics.filter(d => d.type === "error").length === 0;
-  return { success, pdfPath, diagnostics, rawLog: logText, command: res.command, args: res.args, code: res.code };
 }
 
 export async function cleanAux(opts: { root: string; deep?: boolean; outDir?: string; }): Promise<{ cleaned: boolean; command: string; args: string[]; code: number | null; }> {
+  const ws = getWorkspaceRoot();
   const latexmk = which(os.platform() === "win32" ? "latexmk.exe" : "latexmk") || "latexmk";
   const args: string[] = [];
-  if (opts.outDir) { args.push("-outdir=" + path.resolve(opts.outDir)); }
+  if (opts.outDir) { args.push("-outdir=" + ensureInsideWorkspace(opts.outDir, ws)); }
   args.push(opts.deep ? "-C" : "-c");
-  args.push(path.resolve(opts.root));
+  args.push(ensureInsideWorkspace(opts.root, ws));
   const res = await runCommand(latexmk, args, { timeoutMs: 30_000 });
   return { cleaned: res.code === 0, command: res.command, args: res.args, code: res.code };
 }
