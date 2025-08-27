@@ -94,7 +94,7 @@ Milestones (ordered: most relevant/easiest first → least relevant/hardest)
   - Optional save/restore sessions if stable cross-version ✔
   - MCP-managed sessions (session.save/session.restore) ✔ 
 
-- [ ] M21 — Testing suite
+- [x] M21 — Testing suite
   - Unit tests for process runner, command builders, discovery
   - Golden-file tests for log parser (errors, warnings, hboxes, kpathsea)
   - Integration tests (feature-flagged)
