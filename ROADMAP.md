@@ -90,8 +90,9 @@ Milestones (ordered: most relevant/easiest first → least relevant/hardest)
   - Network drive/UNC robustness: extended path handling (toExtendedIfNeeded) applied across tools ✔
   - Transient resilience: runWithRetry helper available and applied to network-sensitive operations ✔
 
-- [ ] M20 — TeXstudio session handling (low priority)
-  - Optional save/restore sessions if stable cross-version
+- [x] M20 — TeXstudio session handling
+  - Optional save/restore sessions if stable cross-version ✔
+  - MCP-managed sessions (session.save/session.restore) ✔ 
 
 - [ ] M21 — Testing suite
   - Unit tests for process runner, command builders, discovery
