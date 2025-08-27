@@ -2,10 +2,11 @@
  * Security helpers for workspace path containment and policy toggles.
  */
 import path from "node:path";
+import { loadConfig } from "../config/load.js";
 
 export function getWorkspaceRoot(): string | null {
-  const r = process.env.WORKSPACE_ROOT;
-  return r ? path.resolve(r) : null;
+  const cfg = loadConfig();
+  return cfg.workspaceRoot ? path.resolve(cfg.workspaceRoot) : null;
 }
 
 export function ensureInsideWorkspace(p: string, root: string | null): string {
@@ -45,4 +46,9 @@ export function isLikelyNetworkPath(p: string | null): boolean {
   if (!p) return false;
   const abs = path.resolve(p);
   return abs.startsWith("\\\\") || abs.startsWith("\\\\?\\UNC\\");
+}
+
+export function shellEscapeAllowed(): boolean {
+  const cfg = loadConfig();
+  return !!cfg.allowShellEscape;
 }

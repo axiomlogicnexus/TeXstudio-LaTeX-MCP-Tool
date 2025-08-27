@@ -12,30 +12,11 @@ import os from "node:os";
 import { runCommand } from "../utils/process.js";
 import { which } from "../discovery/which.js";
 import { resolveExec } from "../discovery/resolveExec.js";
-import { toExtendedIfNeeded } from "../utils/security.js";
+import { toExtendedIfNeeded, getWorkspaceRoot, ensureInsideWorkspace, shellEscapeAllowed } from "../utils/security.js";
 import { parseLatexLog, Diagnostic } from "../parsers/latexLog.js";
+import { loadConfig } from "../config/load.js";
 
-// M13 helpers: workspace containment and shell-escape gating
-function getWorkspaceRoot(): string | null {
-  const r = process.env.WORKSPACE_ROOT;
-  return r ? path.resolve(r) : null;
-}
-
-function ensureInsideWorkspace(p: string, root: string | null): string {
-  const abs = path.resolve(p);
-  if (!root) return abs; // no enforcement if root not defined
-  const normAbs = path.normalize(abs);
-  const normRoot = path.normalize(root);
-  if (normAbs.toLowerCase().startsWith(normRoot.toLowerCase() + path.sep) || normAbs.toLowerCase() === normRoot.toLowerCase()) {
-    return abs;
-  }
-  throw new Error(`Path escapes workspace root: ${abs} (root=${root})`);
-}
-
-function shellEscapeAllowed(): boolean {
-  const v = (process.env.TEX_MCP_ALLOW_SHELL_ESCAPE || "").toLowerCase();
-  return v === "1" || v === "true" || v === "on" || v === "yes";
-}
+// M23: use centralized security/config helpers
 
 export interface CompileOptions {
   root: string;
@@ -105,7 +86,8 @@ async function runBibtexIfNeeded(rootTex: string, outDir?: string): Promise<stri
 
 async function compileWithEngineFallback(opts: CompileOptions): Promise<CompileResult> {
   const ws = getWorkspaceRoot();
-  const engine = opts.engine || "pdflatex";
+  const cfg = loadConfig();
+  const engine = opts.engine || cfg.defaultEngine || "pdflatex";
   const root = ensureInsideWorkspace(opts.root, ws);
   let combined = "";
 
@@ -155,7 +137,8 @@ export async function compileLatex(opts: CompileOptions): Promise<CompileResult>
     if (allowShell) { args.push("-shell-escape"); }
     if (opts.haltOnError) { args.push("-halt-on-error"); }
     if (opts.jobname) { args.push("-jobname=" + opts.jobname); }
-    const engine = opts.engine || "pdflatex";
+    const cfg2 = loadConfig();
+    const engine = opts.engine || cfg2.defaultEngine || "pdflatex";
     args.push("-pdf");
     args.push("-interaction=" + (opts.interaction || "nonstopmode"));
     // Set engine selection for latexmk

@@ -103,9 +103,11 @@ Milestones (ordered: most relevant/easiest first → least relevant/hardest)
   - Add MCP server SDK; expose tools with JSON schemas ✔
   - Streaming outputs/events if supported by client (pending; not required for MVP)
 
-- [ ] M23 — Configuration & precedence
-  - Config schema; precedence: env > user config > project config > defaults
-  - Validation at startup; diagnostics tool for misconfig
+- [x] M23 — Configuration & precedence
+  - Config schema; precedence: env > project file (.texstudio-mcp.json) > defaults ✔
+  - Centralized policy/paths: workspaceRoot, allowShellEscape, defaultEngine, dockerImage, texstudioExe ✔
+  - MCP tool: config.show ✔
+  - Wired into texstudioPath (exe override), container (default image), latex (default engine, policy) ✔
 
 - [ ] M24 — Documentation & examples
   - Client configuration, usage examples, troubleshooting

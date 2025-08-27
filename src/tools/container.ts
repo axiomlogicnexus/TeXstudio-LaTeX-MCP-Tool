@@ -11,6 +11,7 @@ import path from "node:path";
 import { runCommand } from "../utils/process.js";
 import { resolveExec } from "../discovery/resolveExec.js";
 import { getWorkspaceRoot, ensureInsideWorkspace } from "../utils/security.js";
+import { loadConfig } from "../config/load.js";
 
 export async function container_info(): Promise<{ dockerAvailable: boolean; dockerPath: string | null; version?: string | null; images?: string[] }>
 {
@@ -41,7 +42,8 @@ export async function compileLatexInContainer(args: CompileContainerArgs): Promi
   const docker = await resolveExec(os.platform() === "win32" ? "docker.exe" : "docker");
   if (!docker) throw new Error("Docker not available on PATH.");
 
-  const image = args.image || "texlive/texlive";
+  const cfg = loadConfig();
+  const image = args.image || cfg.dockerImage || "texlive/texlive";
   const rootAbs = ensureInsideWorkspace(args.root, ws);
   const relRoot = path.relative(ws, rootAbs).split("\\").join("/");
   const outRel = args.outDir ? path.relative(ws, ensureInsideWorkspace(args.outDir, ws)).split("\\").join("/") : undefined;
@@ -77,7 +79,8 @@ export async function cleanAuxInContainer(args: { image?: string; root: string; 
   if (!ws) throw new Error("WORKSPACE_ROOT must be set to use container tools.");
   const docker = await resolveExec(os.platform() === "win32" ? "docker.exe" : "docker");
   if (!docker) throw new Error("Docker not available on PATH.");
-  const image = args.image || "texlive/texlive";
+  const cfg = loadConfig();
+  const image = args.image || cfg.dockerImage || "texlive/texlive";
   const rootAbs = ensureInsideWorkspace(args.root, ws);
   const relRoot = path.relative(ws, rootAbs).split("\\").join("/");
   const outRel = args.outDir ? path.relative(ws, ensureInsideWorkspace(args.outDir, ws)).split("\\").join("/") : undefined;

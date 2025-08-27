@@ -42,6 +42,7 @@ import { pdf_optimize, pdf_info } from "../tools/pdf.js";
 import { asyncPool } from "../utils/asyncPool.js";
 import { container_info, compileLatexInContainer, cleanAuxInContainer } from "../tools/container.js";
 import { saveSession, restoreSession } from "../tools/session.js";
+import { loadConfig, reloadConfig } from "../config/load.js";
 
 // ---------------------------------------------------------------------------
 // Zod Schemas for tool inputs
@@ -726,6 +727,74 @@ server.registerTool(
   async (args) => {
     const res = await pdf_info(args);
     return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+  }
+);
+
+// M23 — config.show
+server.registerTool(
+  "config.show",
+  {
+    title: "Show effective configuration",
+    description: "Return merged configuration (env > project file > defaults)"
+  },
+  async () => {
+    const cfg = loadConfig();
+    return { content: [{ type: "text", text: JSON.stringify(cfg, null, 2) }] };
+  }
+);
+
+// M23 — config.validate
+server.registerTool(
+  "config.validate",
+  {
+    title: "Validate configuration",
+    description: "Return diagnostics for configuration values"
+  },
+  async () => {
+    const cfg = loadConfig();
+    const diags: any[] = [];
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+
+    // workspaceRoot exists/accessible
+    if (cfg.workspaceRoot) {
+      if (!fs.existsSync(cfg.workspaceRoot)) {
+        diags.push({ key: "workspaceRoot", ok: false, message: `Not found: ${cfg.workspaceRoot}` });
+      } else {
+        diags.push({ key: "workspaceRoot", ok: true, message: cfg.workspaceRoot });
+      }
+    } else {
+      diags.push({ key: "workspaceRoot", ok: false, message: "Not set" });
+    }
+
+    // texstudioExe exists
+    if (cfg.texstudioExe) {
+      diags.push({ key: "texstudioExe", ok: fs.existsSync(cfg.texstudioExe), message: cfg.texstudioExe });
+    } else {
+      diags.push({ key: "texstudioExe", ok: true, message: "Not set (will resolve via PATH/registry)" });
+    }
+
+    // dockerImage non-empty (advisory)
+    diags.push({ key: "dockerImage", ok: !!cfg.dockerImage, message: cfg.dockerImage || "empty (will default to texlive/texlive)" });
+
+    // defaultEngine sanity
+    const engines = ["pdflatex","xelatex","lualatex"]; 
+    diags.push({ key: "defaultEngine", ok: !cfg.defaultEngine || engines.includes(cfg.defaultEngine), message: cfg.defaultEngine || "pdflatex (default)" });
+
+    return { content: [{ type: "text", text: JSON.stringify({ ok: diags.every(d => d.ok !== false), diagnostics: diags }, null, 2) }] };
+  }
+);
+
+// M23 — config.reload
+server.registerTool(
+  "config.reload",
+  {
+    title: "Reload configuration",
+    description: "Drop memoized config and reload from env + project file + defaults"
+  },
+  async () => {
+    const cfg = reloadConfig();
+    return { content: [{ type: "text", text: JSON.stringify({ reloaded: true, config: cfg }, null, 2) }] };
   }
 );
 

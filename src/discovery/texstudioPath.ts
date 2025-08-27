@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { which } from "./which.js";
 import { runCommand } from "../utils/process.js";
+import { loadConfig } from "../config/load.js";
 
 function exists(p?: string | null): p is string {
   return !!p && fs.existsSync(p);
@@ -27,6 +28,9 @@ async function queryRegistryForAppPath(subkey: string): Promise<string | null> {
 }
 
 export async function resolveTeXstudioPath(): Promise<string | null> {
+  // 0) Config override (may come from env or project file)
+  const cfg = loadConfig();
+  if (exists(cfg.texstudioExe)) return cfg.texstudioExe!;
   // 1) Explicit env override
   const envPath = process.env.TEXSTUDIO_EXE;
   if (exists(envPath)) return envPath!;
